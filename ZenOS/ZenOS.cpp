@@ -150,10 +150,21 @@ static void os_pq_remove(TCB* task) {
 /* Find the highest priority READY task — O(1) via bitmap + CLZ */
 /* ── Round-Robin Throttle ──
    When a single task at the highest priority runs, temporarily skip that
-   priority so lower-priority tasks get a turn. Prevents starvation. */
+   priority so lower-priority tasks get a turn. Prevents starvation.
+   A bounded quota counter re-admits the skipped priority after a few
+   lower-priority runs — otherwise a persistently-ready lower priority
+   would starve the single-task level forever. */
 static uint32_t os_rr_skip = 0;
+static uint32_t os_rr_skip_quota = 0;
 
 extern "C" TCB* os_pq_next(void) {
+	/* While a priority is skipped, count down the re-admission quota on
+	   every pick of a lower-priority task. When it expires, re-admit the
+	   skipped priority on the next call. */
+	if (os_rr_skip != 0 && os_rr_skip_quota > 0) {
+		os_rr_skip_quota--;
+		if (os_rr_skip_quota == 0) os_rr_skip = 0;
+	}
 	uint32_t effective = os_ready_bitmap & ~os_rr_skip;
 	if (effective == 0) {
 		/* All priorities were skipped — reset skip mask and try again */
@@ -176,8 +187,13 @@ extern "C" void os_pq_rotate(void) {
 	TCB* head = os_pq_head[p];
 	if (!head) return;
 	if (!head->queue_next) {
-		/* Single task at this priority — skip it next time */
+		/* Single task at this priority — give every ready priority level
+		   one run, then re-admit this level. The quota is derived from
+		   the ready bitmap automatically (no configuration needed), so a
+		   persistently-ready lower priority can never starve it forever. */
 		os_rr_skip |= (1UL << p);
+		os_rr_skip_quota = (uint32_t)__builtin_popcount(os_ready_bitmap);
+		if (os_rr_skip_quota == 0) os_rr_skip_quota = 1;
 		return;
 	}
 	/* Move head to tail */
@@ -189,11 +205,6 @@ extern "C" void os_pq_rotate(void) {
 }
 
 /* ── فقط وقتی تیکلس فعال است ── */
-#if OS_TOOL_TICKLESS_IDLE
-static volatile uint32_t tick_skip = 0;
-#endif
-
-
 static volatile uint32_t os_syst_rvr_normal = 0;
 static uint32_t fault_stack[OS_FAULT_STACK_WORDS] OS_ALIGNED(8);
 
@@ -229,6 +240,16 @@ extern "C" uint32_t os_critical_enter(void) {
 
 extern "C" void os_critical_exit(uint32_t old) {
 	__asm volatile("msr PRIMASK, %0" :: "r"(old) : "memory");
+}
+
+/* ═══════════════ ISR Context Detection ═══════════════ */
+/* True when running inside any exception/ISR (IPSR != 0).
+   os_safe_depth alone is not enough — a blocking call made directly
+   from an ISR would otherwise corrupt the scheduler state. */
+static inline bool os_in_isr(void) {
+	uint32_t ipsr;
+	__asm volatile("mrs %0, IPSR" : "=r"(ipsr));
+	return ipsr != 0;
 }
 
 /* ═══════════════ Forward Declarations ═══════════════ */
@@ -312,7 +333,9 @@ static inline void os_wake_on_timeout_expiry(TCB* task) {
 /* Opt3: os_ms_to_ticks — 32-bit fast path (eliminates 64-bit MUL) */
 static uint32_t os_ms_to_ticks(uint32_t ms) {
 	if (ms == OS_WAIT_FOREVER) return 0;
-	if (ms < (0xFFFFFFFFUL / OS_TICKS_PER_MS)) {
+	/* <= keeps the largest exact value: ms == 0xFFFFFFFF/OS_TICKS_PER_MS
+	   still fits in 32 bits when multiplied. */
+	if (ms <= (0xFFFFFFFFUL / OS_TICKS_PER_MS)) {
 		uint32_t r = ms * OS_TICKS_PER_MS;
 		return r ? r : 1;
 	}
@@ -468,9 +491,17 @@ extern "C" int8_t _os_task_create_internal(
 	task->magic         = OS_TCB_MAGIC;
 	task->overflow_count = 0;
 #endif
+#if OS_SAFETY_MPU
+	task->mpu_region_count = 0;
+#endif
 
 	uintptr_t addr = (uintptr_t)stack_mem;
+#if OS_SAFETY_MPU
+	/* MPU stack region needs a 32B-aligned base (see os_mpu_configure_task) */
+	addr = (addr + 31) & ~31;
+#else
 	addr = (addr + 7) & ~7;
+#endif
 	task->stack_base = (uint32_t*)addr;
 
 	os_stack_init(task);
@@ -580,22 +611,17 @@ static bool os_tickless_process(uint32_t skip) {
 }
 #endif /* OS_TOOL_TICKLESS_IDLE */
 
-/* ═══════════════ Tick Handler ═══════════════ */
-extern "C" void os_tick(void) {
+/* ═══════════════ Tick Handler ═══════════════ */	extern "C" void os_tick(void) {
 
-#if OS_TOOL_TICKLESS_IDLE
-	uint32_t skip = tick_skip;
-	tick_skip = 0;
-	if (skip > 0) {
-		if (current_task == &idle_tcb) idle_ticks += skip;
-		os_tickless_process(skip);
-	}
-#endif
+	/* ═══════ C2 fix: one critical section for the whole tick path ═══════
+	   os_tickless_process() and os_stack_check_all() mutate global
+	   scheduler state (priority queues, bitmap, blocked_count). They must
+	   run with interrupts disabled, otherwise a higher-priority ISR
+	   (e.g. EXTI calling os_event_signal_from_isr) can corrupt that state
+	   concurrently. */
+	uint32_t cs = os_critical_enter();
 
 	tick_count++;
-
-	/* ═══════ C1 fix: protect TCB access from PendSV race ═══════ */
-	uint32_t cs = os_critical_enter();
 
 	if (current_task == &idle_tcb) idle_ticks++;
 	else if (current_task && current_task->state == TaskState::RUNNING) {
@@ -664,10 +690,12 @@ extern "C" void os_tick(void) {
 		}
 	}
 
-	os_critical_exit(cs);
-	/* ═══════ end C1 fix ═══════ */
-
+	/* Stack check mutates the same scheduler structures, so it stays
+	   inside the critical section too. */
 	if ((tick_count & 0x0F) == 0) os_stack_check_all();
+
+	os_critical_exit(cs);
+	/* ═══════ end C2 fix ═══════ */
 
 	/* Always fire PendSV — scheduler handles time-slicing,
 	   periodic task period, and round-robin rotation. */
@@ -709,7 +737,9 @@ extern "C" void os_delay_us(uint32_t us) {
 }
 
 extern "C" void os_delay_ms(uint32_t ms) {
-	if (os_safe_depth > 0) { os_report_error(OSError::SAFE_DELAY_MS); return; }
+	/* Never block from an ISR: os_safe_depth only catches the RAII guards,
+	   os_in_isr() catches every exception context. */
+	if (os_safe_depth > 0 || os_in_isr()) { os_report_error(OSError::SAFE_DELAY_MS); return; }
 	if (ms == 0) return;
 
 	uint32_t delay_ticks = os_ms_to_ticks(ms);
@@ -746,7 +776,7 @@ extern "C" void os_yield(void) {
 
 /* ═══════════════ Events ═══════════════ */
 #if OS_TOOL_EVENT
-int8_t os_event_next_id = 0;
+int16_t os_event_next_id = 0;
 
 extern "C" void os_event_register(ECB* e) {
 	if (!e) return;
@@ -770,7 +800,7 @@ extern "C" void os_event_unregister(ECB* e) {
 	os_critical_exit(cs);
 }
 
-extern "C" void os_event_destroy(int8_t id) {
+extern "C" void os_event_destroy(int16_t id) {
 	uint32_t cs = os_critical_enter();
 	ECB* e = event_list;
 	while (e) { if (e->id == id && e->in_use) break; e = e->next; }
@@ -779,13 +809,13 @@ extern "C" void os_event_destroy(int8_t id) {
 	os_critical_exit(cs);
 }
 
-static ECB* os_find_event(int8_t id) {
+static ECB* os_find_event(int16_t id) {
 	ECB* e = event_list;
 	while (e) { if (e->id == id && e->in_use) return e; e = e->next; }
 	return nullptr;
 }
 
-extern "C" void os_event_signal(int8_t id) {
+extern "C" void os_event_signal(int16_t id) {
 	uint32_t cs = os_critical_enter();
 	ECB* e = os_find_event(id);
 	if (!e) { os_critical_exit(cs); os_report_error(OSError::INVALID_EVENT_ID); return; }
@@ -807,8 +837,9 @@ extern "C" void os_event_signal_from_isr(uint32_t mask) {
 	uint32_t cs = os_critical_enter();
 	ECB* e = event_list;
 	while (e && mask) {
-		/* Mask is 32-bit; events with id >= 32 are not addressable here */
-		if (e->in_use && (uint8_t)e->id < 32) {
+		/* Mask is 32-bit; events with id >= 32 are not addressable here
+		   (signal them individually instead) */
+		if (e->in_use && e->id >= 0 && e->id < 32) {
 			uint32_t bit = 1UL << e->id;
 			if (mask & bit) {
 				mask &= ~bit;
@@ -830,11 +861,11 @@ extern "C" void os_event_signal_from_isr(uint32_t mask) {
 	if (woke) OS_SCB_ICSR = OS_ICSR_PENDSVSET_Msk;
 }
 
-extern "C" int os_event_wait(int8_t id, uint32_t timeout_ms) {
+extern "C" int os_event_wait(int16_t id, uint32_t timeout_ms) {
 	uint32_t cs = os_critical_enter();
 	ECB* e = os_find_event(id);
 	if (!e) { os_critical_exit(cs); os_report_error(OSError::INVALID_EVENT_ID); return 0; }
-	if (os_safe_depth > 0 && timeout_ms > 0) {
+	if ((os_safe_depth > 0 || os_in_isr()) && timeout_ms > 0) {
 		os_critical_exit(cs);
 		os_report_error(OSError::SAFE_EVENT_WAIT);
 		return 0;
@@ -869,6 +900,8 @@ extern "C" int os_event_wait(int8_t id, uint32_t timeout_ms) {
 extern "C" TCB* os_get_current_task(void) { return current_task; }
 
 extern "C" void os_mutex_block_on(void* obj, uint32_t timeout_ticks) {
+	/* Blocking from an ISR would corrupt the scheduler — refuse */
+	if (os_in_isr()) { os_report_error(OSError::SAFE_MUTEX_LOCK); return; }
 	uint32_t cs = os_critical_enter();
 	os_block_current(TaskState::BLOCKED, obj, timeout_ticks, 0);
 	os_critical_exit(cs);
@@ -1001,7 +1034,7 @@ void OS_EVENT::signal(uint32_t mask) {
 		while (mask) {
 			uint8_t i = __builtin_ctz(mask);
 			mask &= mask - 1;
-			os_event_signal((int8_t)i);
+			os_event_signal((int16_t)i);
 		}
 	} else {
 		os_event_signal(id);
@@ -1049,10 +1082,19 @@ bool OS_MUTEX::lock(uint32_t timeout_ms) {
 				self->mutex_nesting++;
 				if (self->mutex_nesting == 1) {
 					self->base_priority = self->priority;
-					/* IPC: immediately boost to ceiling priority */
+					/* IPC: immediately boost to ceiling priority.
+					   Re-queue in the O(1) priority queues so the scheduler
+					   sees the boosted priority (READY/RUNNING tasks stay
+					   queued in this design). */
 					if (ceiling_priority > self->priority) {
+						if (self->state != TaskState::BLOCKED &&
+						    self->state != TaskState::INACTIVE)
+							os_pq_remove(self);
 						self->priority = ceiling_priority;
 						priority_boosted = true;
+						if (self->state != TaskState::BLOCKED &&
+						    self->state != TaskState::INACTIVE)
+							os_pq_add(self);
 					}
 				}
 			}
@@ -1094,10 +1136,17 @@ void OS_MUTEX::unlock() {
 			__asm volatile("msr PRIMASK, %0" :: "r"(cs) : "memory");
 			return;
 		}
-		/* IPC: restore original priority */
+		/* IPC: restore original priority and re-queue so the scheduler
+		   sees the un-boosted priority again. */
 		if (priority_boosted) {
+			if (owner->state != TaskState::BLOCKED &&
+			    owner->state != TaskState::INACTIVE)
+				os_pq_remove(owner);
 			owner->priority = owner->base_priority;
 			priority_boosted = false;
+			if (owner->state != TaskState::BLOCKED &&
+			    owner->state != TaskState::INACTIVE)
+				os_pq_add(owner);
 		}
 	}
 
@@ -1108,10 +1157,13 @@ void OS_MUTEX::unlock() {
 		new_owner->mutex_nesting++;
 		if (new_owner->mutex_nesting == 1) {
 			new_owner->base_priority = new_owner->priority;
-			/* IPC: boost new owner to ceiling */
+			/* IPC: boost new owner to ceiling and re-queue (it was just
+			   woken by os_mutex_handoff → READY and queued). */
 			if (ceiling_priority > new_owner->priority) {
+				os_pq_remove(new_owner);
 				new_owner->priority = ceiling_priority;
 				priority_boosted = true;
+				os_pq_add(new_owner);
 			}
 		}
 	}
@@ -1319,7 +1371,7 @@ extern "C" void os_ram_test_step(void) {
 	*ram_test_current = ~val;
 	if (*ram_test_current != ~val) {
 		ram_test_errors++;
-		os_report_error(OSError::STACK_OVERFLOW); /* reuse code */
+		os_report_error(OSError::RAM_TEST_FAIL);
 	}
 	*ram_test_current = val;
 	ram_test_current++;
@@ -1358,6 +1410,9 @@ extern "C" bool os_ram_test_complete(void) {
 static volatile uint32_t hw_wdg_reset_count_var = 0;
 
 extern "C" void os_hw_watchdog_feed(void) {
+	/* Wait for any ongoing prescaler/reload update to finish
+	   (IWDG->SR bits PVU|RVU) so the feed is not dropped. */
+	while (*((volatile uint32_t*)0x4000300CUL) & 0x03UL) { }
 	/* Direct register access — no HAL dependency */
 	*((volatile uint32_t*)0x40003000UL) = 0xAAAA;  /* IWDG->KR */
 }
@@ -1475,29 +1530,76 @@ typedef struct {
 #define MPU_RASR_ENABLE_Pos     0
 #define MPU_RASR_AP_Pos         24
 #define MPU_RASR_SIZE_Pos       1
+#define MPU_RASR_XN_Pos         28
+/* AP values: 3 = RW for both privilege levels, 5 = RO for both */
+#define MPU_AP_FULL_ACCESS  3
+#define MPU_AP_READONLY     5
+
+/* Program one MPU region. Caller must keep the MPU disabled (CTRL=0)
+   while reprogramming — required by ARMv7-M. */
+static void os_mpu_set_region(uint8_t region, uint32_t base,
+                              uint32_t size_bytes, uint32_t ap, bool xn) {
+	if (region >= OS_MPU_MAX_REGIONS) return;
+	/* RASR SIZE field = log2(region_size) - 1 (region = 2^(SIZE+1) bytes) */
+	uint32_t size_log = 4;
+	while ((1UL << (size_log + 1)) < size_bytes && size_log < 31) size_log++;
+	MPU->RNR  = region;
+	MPU->RBAR = base;
+	MPU->RASR = (1UL << MPU_RASR_ENABLE_Pos) |
+	            ((ap & 0x07UL) << MPU_RASR_AP_Pos) |
+	            (size_log << MPU_RASR_SIZE_Pos) |
+	            (xn ? (1UL << MPU_RASR_XN_Pos) : 0UL);
+}
 
 extern "C" void os_mpu_init(void) {
 	MPU->CTRL = 0;
+	__asm volatile("dsb" ::: "memory");
+	__asm volatile("isb");
+	/* Static regions shared by all tasks:
+	   0 = flash (code)  — read-only, executable
+	   1 = SRAM (data)   — read/write (tasks share data memory)
+	   2 = peripherals   — read/write, non-executable
+	   3 = per-task stack — programmed in os_mpu_configure_task
+	   4+ = extra regions via os_mpu_add_region
+	   PRIVDEFENA lets privileged code (kernel, idle, ISRs) bypass the MPU;
+	   tasks run unprivileged (CONTROL.nPRIV set in PendSV) and are
+	   restricted to the regions above. */
+	os_mpu_set_region(0, OS_FLASH_START, OS_FLASH_SIZE, MPU_AP_READONLY, false);
+	os_mpu_set_region(1, OS_RAM_START,    OS_RAM_SIZE,    MPU_AP_FULL_ACCESS, true);
+	os_mpu_set_region(2, 0x40000000UL,    0x20000000UL,   MPU_AP_FULL_ACCESS, true);
+	MPU->CTRL = MPU_CTRL_ENABLE_Msk | MPU_CTRL_PRIVDEFENA_Msk;
+	__asm volatile("dsb" ::: "memory");
+	__asm volatile("isb");
 }
 
 extern "C" void os_mpu_configure_task(void* tcb_ptr) {
 	TCB* task = (TCB*)tcb_ptr;
 	if (!task) return;
+	/* Must disable the MPU before changing any region (ARMv7-M) */
 	MPU->CTRL = 0;
-	MPU->RNR = 0;
-	MPU->RBAR = ((uint32_t)task->stack_base) & ~0x1F;
-	uint32_t size_log = 4;
-	uint32_t size_bytes = task->stack_size * 4;
-	while ((1UL << size_log) < size_bytes && size_log < 31) size_log++;
-	MPU->RASR = (1UL << MPU_RASR_ENABLE_Pos) |
-	            (3UL << MPU_RASR_AP_Pos) |
-	            (size_log << MPU_RASR_SIZE_Pos);
+	__asm volatile("dsb" ::: "memory");
+	/* Region 3: this task's stack — read/write, non-executable */
+	os_mpu_set_region(3, (uint32_t)task->stack_base & ~0x1FUL,
+	                  task->stack_size * 4, MPU_AP_FULL_ACCESS, true);
+	/* Extra per-task regions (4+) added via os_mpu_add_region */
+	for (uint8_t i = 0; i < task->mpu_region_count && (4U + i) < OS_MPU_MAX_REGIONS; i++) {
+		os_mpu_set_region(4 + i, task->mpu_regions[i].base_address,
+		                  task->mpu_regions[i].size,
+		                  task->mpu_regions[i].attributes, true);
+	}
 	MPU->CTRL = MPU_CTRL_ENABLE_Msk | MPU_CTRL_PRIVDEFENA_Msk;
+	__asm volatile("dsb" ::: "memory");
 	__asm volatile("isb");
 }
 
 extern "C" void os_mpu_add_region(void* tcb_ptr, uint32_t base, uint32_t size, uint32_t attrs) {
-	(void)tcb_ptr; (void)base; (void)size; (void)attrs;
+	TCB* task = (TCB*)tcb_ptr;
+	if (!task) return;
+	if (task->mpu_region_count >= OS_MPU_MAX_REGIONS) return;
+	task->mpu_regions[task->mpu_region_count].base_address = base;
+	task->mpu_regions[task->mpu_region_count].size         = size;
+	task->mpu_regions[task->mpu_region_count].attributes   = attrs;
+	task->mpu_region_count++;
 }
 
 extern "C" void os_mpu_disable(void) {
@@ -1581,19 +1683,28 @@ static bool os_idle_tickless(void) {
 		uint32_t cvr_val = OS_SYST_CVR;
 		OS_SYST_CSR = 0;
 
-		/* Always derive skip from the hardware counter, not COUNTFLAG.
-		   COUNTFLAG is sticky (stays set until CSR is read) and can be
-		   stale when a higher-priority ISR preempts the SysTick ISR.
+		/* Always derive the elapsed time from the hardware counter, not
+		   COUNTFLAG. COUNTFLAG is sticky (stays set until CSR is read) and
+		   can be stale when a higher-priority ISR preempts the SysTick ISR.
 		   CVR reflects actual elapsed time regardless of ISR state. */
 		if (cvr_val < hw_sleep) {
 			uint32_t elapsed_hw = (hw_sleep - 1) - cvr_val;
-			tick_skip = elapsed_hw / ticks_per_os_tick;
+			uint32_t skip = elapsed_hw / ticks_per_os_tick;
+			if (skip > 0) {
+				/* C3 fix: apply the skipped time right now, inside the CS —
+				   forward tick_count and wake expired tasks. Deferring this
+				   to the next SysTick loses time whenever another IRQ (e.g.
+				   the HAL TIM1 time base) wakes us repeatedly before that
+				   SysTick fires, because tick_skip would be overwritten. */
+				idle_ticks += skip;
+				if (os_tickless_process(skip)) {
+					/* A task expired while we slept — reschedule now */
+					OS_SCB_ICSR = OS_ICSR_PENDSVSET_Msk;
+				}
+			}
 		}
-		else {
-			/* CVR >= hw_sleep means SysTick hasn't started counting
-		       down yet (or counter just reloaded). No ticks to skip. */
-			tick_skip = 0;
-		}
+		/* else: CVR >= hw_sleep means SysTick hasn't started counting
+		   down yet (or counter just reloaded). No time elapsed. */
 
 		OS_SYST_CVR = 0;
 		OS_SYST_RVR = saved_rvr;
@@ -1632,15 +1743,13 @@ extern "C" void os_init(void) {
 	idle_tcb.priority = 0; idle_tcb.base_priority = 0;
 	idle_tcb.state = TaskState::INACTIVE;
 	idle_tcb.next = nullptr;
-#if OS_TOOL_TICKLESS_IDLE
-	tick_skip = 0;
-#endif
 	os_safe_depth = 0; error_total = 0; error_last = OSError::NONE;
 	idle_ticks = 0; wdg_reset_count = 0; stack_recovery_count = 0;
 	os_syst_rvr_normal = 0;
 	/* O(1) scheduler: initialize priority bitmap and queues */
 	os_ready_bitmap = 0;
 	os_rr_skip = 0;
+	os_rr_skip_quota = 0;
 	for (uint32_t i = 0; i < 32; i++) os_pq_head[i] = nullptr;
 
 
@@ -1648,6 +1757,9 @@ extern "C" void os_init(void) {
 	OS_COREDEBUG_DEMCR |= OS_COREDEM_TRCENA;
 	OS_DWT_CYCCNT = 0;
 	OS_DWT_CTRL  |= OS_DWT_CYCCNTENA;
+#endif
+#if OS_SAFETY_MPU
+	os_mpu_init();
 #endif
 }
 
@@ -1816,6 +1928,29 @@ extern "C" OS_NAKED OS_USED void OS_PendSV_Handler(void) {
 	    "movs r6, #2\n"
 	    "strb r6, [r5, #" OS_STR(OS_OFF_STATE) "]\n"
 	    "ldr r0, [r5, #" OS_STR(OS_OFF_STACK_TOP) "]\n"
+#if OS_SAFETY_MPU
+	    /* ── MPU per-task switch (next task in r5) ──
+	       Tasks run unprivileged (CONTROL.nPRIV=1); the idle task stays
+	       privileged so it can reach everything (watchdog, CRC, MPU). */
+	    "ldr   r6, [r9]\n"
+	    "cmp   r5, r6\n"
+	    "beq   3f\n"
+	    "mrs   r6, CONTROL\n"
+	    "orr   r6, r6, #0x01\n"
+	    "msr   CONTROL, r6\n"
+	    "isb\n"
+	    "push  {r0-r3, lr}\n"
+	    "mov   r0, r5\n"
+	    "bl    os_mpu_configure_task\n"
+	    "pop   {r0-r3, lr}\n"
+	    "b     4f\n"
+	    "3:\n"
+	    "mrs   r6, CONTROL\n"
+	    "bic   r6, r6, #0x01\n"
+	    "msr   CONTROL, r6\n"
+	    "isb\n"
+	    "4:\n"
+#endif
 
 	    "restore_ctx:\n"
 	    "ldmia r0!, {r4-r11}\n"

@@ -155,6 +155,8 @@ enum class OSError : uint8_t {
     DEADLINE_MISS     = 11,
     TCB_CORRUPTED     = 12,
     SENSOR_TIMEOUT    = 13,
+    SAFE_MUTEX_LOCK   = 14,
+    RAM_TEST_FAIL     = 15,
     ERROR_COUNT
 };
 
@@ -451,7 +453,12 @@ template <void(*Entry)(void), uint32_t StackBytes = OS_KERNEL_STACK_SIZE>
 inline int8_t _os_task_create_impl(const char* name,
     uint8_t priority = 1, uint32_t period_ms = 0)
 {
+#if OS_SAFETY_MPU
+	/* MPU stack region needs a 32B-aligned base (see os_mpu_configure_task) */
+	static uint32_t stack_raw[(StackBytes / 4) + 8] __attribute__((aligned(32)));
+#else
 	static uint32_t stack_raw[(StackBytes / 4) + 8] __attribute__((aligned(8)));
+#endif
     static TCB tcb;
     static bool created = false;
     if (created) return -1;
@@ -516,28 +523,34 @@ public:
 /* --- OS_EVENT --- */
 #if OS_TOOL_EVENT
 
-struct ECB { volatile uint32_t count; volatile uint32_t in_use; int8_t id; ECB* next; };
+struct ECB { volatile uint32_t count; volatile uint32_t in_use; int16_t id; ECB* next; };
 
 extern "C" {
-    void os_event_signal(int8_t id);
+    void os_event_signal(int16_t id);
     void os_event_signal_from_isr(uint32_t mask);
 }
 
 extern "C" {
     void    os_event_register(ECB* e);
     void    os_event_unregister(ECB* e);
-    void    os_event_destroy(int8_t id);
-    int     os_event_wait(int8_t id, uint32_t timeout_ms);
-    extern int8_t os_event_next_id;
+    void    os_event_destroy(int16_t id);
+    int     os_event_wait(int16_t id, uint32_t timeout_ms);
+    extern int16_t os_event_next_id;
 }
 
 class OS_EVENT {
 public:
     ECB ecb;
-    int8_t id;
+    int16_t id;     /* -1 = unregistered; IDs auto-assigned, no practical limit */
     OS_EVENT();
     ~OS_EVENT();
     void destroy();
+    /* Mask-based signaling only covers IDs 0..31 (32-bit mask).
+       Events with ID >= 32 are fully supported but must be signaled
+       individually:
+           ev.signal();          // task context
+           ev.signal_from_isr(); // ISR context (falls back safely)
+       Combining an ID >= 32 with | would not fit in the mask. */
     void signal(uint32_t mask = 0);
     void signal_from_isr(uint32_t mask = 0);
     int wait(uint32_t timeout_ms = OS_WAIT_FOREVER);
@@ -546,7 +559,11 @@ public:
 };
 
 static inline uint32_t operator|(const OS_EVENT& a, const OS_EVENT& b) {
-    return (1UL << a.id) | (1UL << b.id);
+    /* Guard against undefined shifts: only IDs 0..31 fit in a 32-bit mask */
+    uint32_t m = 0;
+    if (a.id >= 0 && a.id < 32) m |= (1UL << a.id);
+    if (b.id >= 0 && b.id < 32) m |= (1UL << b.id);
+    return m;
 }
 
 #endif /* OS_TOOL_EVENT */

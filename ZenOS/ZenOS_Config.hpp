@@ -73,17 +73,17 @@
 
 /* Deadline monitoring: detect and act on task deadline misses */
 #ifndef OS_MONITOR_DEADLINE
-#define OS_MONITOR_DEADLINE    0
+#define OS_MONITOR_DEADLINE    1
 #endif
 
 /* TCB integrity: magic-number check for memory corruption detection */
 #ifndef OS_MONITOR_TCB_INTEGRITY
-#define OS_MONITOR_TCB_INTEGRITY  0
+#define OS_MONITOR_TCB_INTEGRITY  1
 #endif
 
 /* Error log: circular buffer recording errors with timestamp and task ID */
 #ifndef OS_MONITOR_ERROR_LOG
-#define OS_MONITOR_ERROR_LOG   0
+#define OS_MONITOR_ERROR_LOG   1
 #endif
 
 /* Error log capacity (number of entries) */
@@ -100,22 +100,22 @@
 
 /* RAM test: background March C- algorithm for SRAM integrity */
 #ifndef OS_SAFETY_RAM_TEST
-#define OS_SAFETY_RAM_TEST     0
+#define OS_SAFETY_RAM_TEST     1
 #endif
 
 /* MPU: hardware memory protection per task (Cortex-M3/M4/M7) */
 #ifndef OS_SAFETY_MPU
-#define OS_SAFETY_MPU          0
+#define OS_SAFETY_MPU          1
 #endif
 
 /* Hardware watchdog feed/check integration */
 #ifndef OS_SAFETY_HW_WATCHDOG
-#define OS_SAFETY_HW_WATCHDOG  0
+#define OS_SAFETY_HW_WATCHDOG  1
 #endif
 
 /* CRC check: ROM integrity verification via CRC peripheral */
 #ifndef OS_SAFETY_CRC_CHECK
-#define OS_SAFETY_CRC_CHECK    0
+#define OS_SAFETY_CRC_CHECK    1
 #endif
 
 /* Software watchdog: detect stuck tasks and recover */
@@ -125,7 +125,7 @@
 
 /* Action on deadline miss: 0 = log only, 1 = reset task, 2 = disable task */
 #ifndef OS_SAFETY_DEADLINE_ACTION
-#define OS_SAFETY_DEADLINE_ACTION  0
+#define OS_SAFETY_DEADLINE_ACTION  1
 #endif
 
 /* Max task recovery attempts before permanent disable */
