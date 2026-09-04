@@ -181,23 +181,17 @@ Your donation directly funds development, testing, certification, and documentat
 
 #### ₿ Bitcoin (BTC)
 
-`bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh`
+`bc1qd39vgmnweuzh5hp2cqm4cnh782xga6wph3v650`
 
 </td>
 <td align="center">
 
 #### Ξ Ethereum (ETH) / USDT (ERC-20)
 
-`0x742d35Cc6634C0532925a3b844Bc9e7595f2bD3e`
+`0x1C21c39324F65a38Fb8de9ccB92aB01FdeD1534C`
 
 </td>
-<td align="center">
 
-####₮ Tether (USDT - TRC-20)
-
-`TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9`
-
-</td>
 </tr>
 </table>
 
