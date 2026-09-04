@@ -5,7 +5,7 @@
  *
  * Extracted from ZenOS.cpp as part of the modular split.
  *
- * @author  Rahman Heidari (rahman.h22@gmail.com)
+ * @author  Raymon Research Group (rahman.h22@gmail.com)
  * @version 1.0.0
  */
 

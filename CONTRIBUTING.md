@@ -92,14 +92,22 @@ ZenOS/
 │   ├── ZenOS_Config.hpp       # User configuration
 │   ├── ZenOS_Port.hpp         # Hardware detection
 │   ├── ZenOS_Internal.hpp     # Internal structures
+│   ├── ZenOS_c.h              # C-compatible header
 │   ├── ZenOS.cpp              # Kernel core
 │   ├── ZenOS_Scheduler.cpp    # Scheduler
 │   ├── ZenOS_Safety.cpp       # Safety features
 │   ├── ZenOS_IPC.cpp          # IPC primitives
 │   └── ZenOS_Monitor.cpp      # Monitoring
-├── Src/
-│   └── main.cpp               # Application + test suite
-└── Startup/                   # ARM startup assembly
+├── README.md                  # English README
+├── README_FA.md               # Persian README
+├── API_TUTORIAL.md            # English API guide
+├── API_TUTORIAL_FA.md         # Persian API guide
+├── SAFETY_MANUAL.md           # English safety manual
+├── SAFETY_MANUAL_FA.md        # Persian safety manual
+├── CONTRIBUTING.md            # English contributing guide
+├── CONTRIBUTING_FA.md         # Persian contributing guide
+├── ZENOS_ADVANTAGES.md        # Technical comparison with other RTOSes
+└── LICENSE                    # MIT License
 ```
 
 ### Important: TCB Layout

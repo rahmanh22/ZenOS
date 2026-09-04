@@ -76,7 +76,7 @@
 
 <بدنه اختیاری — چرا را توضیح دهید، نه چه را>
 
-<پا占用 اختیاری>
+<پا اختیاری>
 ```
 
 انواع: `feat`، `fix`، `docs`، `test`، `refactor`، `style`، `chore`
@@ -92,14 +92,22 @@ ZenOS/
 │   ├── ZenOS_Config.hpp       # پیکربندی کاربر
 │   ├── ZenOS_Port.hpp         # تشخیص سخت‌افزار
 │   ├── ZenOS_Internal.hpp     # ساختارهای داخلی
+│   ├── ZenOS_c.h              # هدر سازگار با C
 │   ├── ZenOS.cpp              # هسته سیستم‌عامل
 │   ├── ZenOS_Scheduler.cpp    # زمان‌بند
 │   ├── ZenOS_Safety.cpp       # ویژگی‌های ایمنی
 │   ├── ZenOS_IPC.cpp          # اصول اولیه IPC
 │   └── ZenOS_Monitor.cpp      # پایش
-├── Src/
-│   └── main.cpp               # برنامه + مجموعه تست
-└── Startup/                   # کد راه‌انداز ARM
+├── README.md                  # README انگلیسی
+├── README_FA.md               # README فارسی
+├── API_TUTORIAL.md            # راهنمای API انگلیسی
+├── API_TUTORIAL_FA.md         # راهنمای API فارسی
+├── SAFETY_MANUAL.md           # راهنمای ایمنی انگلیسی
+├── SAFETY_MANUAL_FA.md        # راهنمای ایمنی فارسی
+├── CONTRIBUTING.md            # راهنمای مشارکت انگلیسی
+├── CONTRIBUTING_FA.md         # راهنمای مشارکت فارسی
+├── ZENOS_ADVANTAGES.md        # مقایسه فنی با RTOSهای دیگر
+└── LICENSE                    # مجوز MIT
 ```
 
 ### مهم: چیدمان TCB
@@ -118,4 +126,4 @@ ZenOS/
 
 ## مجوز
 
-با مشارکت، شما موافقت می‌کنید که مشارکت‌هایتان تحت مجوز MIT许可 شود.
+با مشارکت، شما موافقت می‌کنید که مشارکت‌هایتان تحت مجوز MIT شود.

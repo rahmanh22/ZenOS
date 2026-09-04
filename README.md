@@ -13,6 +13,10 @@
 
 <br>
 
+[**🇮🇷 فارسی**](README_FA.md) | [**🇬🇧 English**](README.md)
+
+<br>
+
 *ZenOS — fewer lines, fewer headaches.*
 
 </div>
@@ -39,6 +43,21 @@ It's built for ARM Cortex-M (M3, M4, M7) on STM32, and it carries a set of safet
 | 🏭 IEC 61508 | Compile-time safety enforcement for industrial systems |
 | 🧪 Tested | On real hardware (STM32F103C8T6) with 22+ test suites |
 | 🔒 Zero Overhead | C++ templates and RAII — abstraction without runtime cost |
+
+### ⚡ Why ZenOS?
+
+| Advantage | ZenOS | FreeRTOS | Zephyr |
+|:----------|:------|:---------|:-------|
+| **Tick resolution** | **100μs** (10× finer) | 1ms | 10ms |
+| **Scheduler** | **O(1) always** | O(n) worst case | O(n) within priority |
+| **Heap allocation** | **Never (deterministic)** | Available (risky) | Available |
+| **Safety built-in** | **Yes (canary, MPU, watchdog, RAM test, CRC)** | Optional package | Optional package |
+| **IEC 62304/61508** | **Compile-time enforcement** | None | None |
+| **Periodic tasks** | **First-class (not timers)** | Use software timers | Use software timers |
+| **IPC ceiling** | **Immediate Priority Ceiling** | Priority inheritance only | None |
+| **C++ RAII** | **Full support** | None | Partial |
+
+> 📖 [Full technical comparison → ZENOS_ADVANTAGES.md](ZENOS_ADVANTAGES.md)
 
 ### 🖥️ Supported Families
 
@@ -114,6 +133,7 @@ For the full API guide → [API_TUTORIAL.md](API_TUTORIAL.md) | [راهنمای 
 | 📘 [API_TUTORIAL.md](API_TUTORIAL.md) | Complete API guide with examples (English) |
 | 📗 [API_TUTORIAL_FA.md](API_TUTORIAL_FA.md) | Complete API guide with examples (Persian) |
 | 🤝 [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| ⚡ [ZENOS_ADVANTAGES.md](ZENOS_ADVANTAGES.md) | Technical comparison with FreeRTOS, Zephyr, RT-Thread |
 | ⚙️ [ZenOS_Config.hpp](ZenOS/ZenOS/ZenOS_Config.hpp) | Every config option with safety annotations |
 
 ---
@@ -175,27 +195,48 @@ Writing good documentation takes time. Answering issues takes time. Both matter.
 
 Your donation directly funds development, testing, certification, and documentation.
 
+<br>
+
 <table>
 <tr>
-<td align="center">
+<td align="center" width="50%">
 
-#### ₿ Bitcoin (BTC)
+<sup>
+
+**🟠 Bitcoin (BTC)**
+
+</sup>
+
+<code style="font-size: 1.4em; font-weight: bold; color: #f7931a; background: #1a1a2e; padding: 8px 16px; border-radius: 8px;">
 
 `bc1qd39vgmnweuzh5hp2cqm4cnh782xga6wph3v650`
 
-</td>
-<td align="center">
+</code>
 
-#### Ξ Ethereum (ETH) / USDT (ERC-20)
+</td>
+<td align="center" width="50%">
+
+<sup>
+
+**🔵 Ethereum (ETH) / USDT (ERC-20)**
+
+</sup>
+
+<code style="font-size: 1.4em; font-weight: bold; color: #627eea; background: #1a1a2e; padding: 8px 16px; border-radius: 8px;">
 
 `0x1C21c39324F65a38Fb8de9ccB92aB01FdeD1534C`
 
-</td>
+</code>
 
+</td>
 </tr>
 </table>
 
+<br>
+
 > ☕ Even a few dollars helps. If everyone who cloned this repo bought me a coffee, I could afford a proper test bench for every STM32 family and hire someone to help with the certification paperwork.
+
+> 📩 **After making a donation, please send an email to [rahman.h22@gmail.com](mailto:rahman.h22@gmail.com) with your transaction ID or wallet address so I can personally thank you.** Every supporter will be acknowledged on this page.
 
 ### 🌟 Other ways to help
 
@@ -207,6 +248,16 @@ Your donation directly funds development, testing, certification, and documentat
 <td align="center">🗣️<br><b>Tell</b><br>someone</td>
 </tr>
 </table>
+
+---
+
+## 📬 Contact
+
+**Raymon Research Group** — گروه علمی و تحقیقاتی رایمون
+
+📧 Email: [rahman.h22@gmail.com](mailto:rahman.h22@gmail.com)
+
+For questions, suggestions, or collaboration opportunities, feel free to reach out. I'm always happy to hear from developers using ZenOS in their projects.
 
 ---
 

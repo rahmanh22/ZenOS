@@ -9,7 +9,7 @@
  *   ZenOS_Safety.cpp    — Error system, stack check, fault handler, watchdog, CRC, RAM test, MPU
  *   ZenOS_Monitor.cpp   — Stack watermark, CPU usage, deadline, error log
  *
- * @author  Rahman Heidari (rahman.h22@gmail.com)
+ * @author  Raymon Research Group (rahman.h22@gmail.com)
  * @version 1.0.0
  */
 

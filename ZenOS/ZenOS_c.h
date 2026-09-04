@@ -4,6 +4,9 @@
  * @file    ZenOS_c.h
  * @brief   Thin C wrapper for ZenOS — use from .c files only
  *
+ * @author  Raymon Research Group (rahman.h22@gmail.com)
+ * @version 1.0.0
+ *
  * Declares every ZenOS function callable from C. For C++ code include
  * ZenOS.hpp directly (C++-only features: task creation templates, RAII
  * guards OS_SAFE/OS_LOCK, OS_EVENT, OS_MUTEX, OS_QUEUE, OS_SEMAPHORE,

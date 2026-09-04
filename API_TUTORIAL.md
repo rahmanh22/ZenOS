@@ -14,11 +14,12 @@
 6. [Mutexes (OS_MUTEX)](#6-mutexes-os_mutex)
 7. [Queues (OS_QUEUE)](#7-queues-os_queue)
 8. [Semaphores (OS_SEMAPHORE)](#8-semaphores-os_semaphore)
-9. [Periodic Tasks — The ZenOS Way (No Software Timers)](#9-periodic-tasks--the-zenos-way-no-software-timers)
+9. [Periodic Tasks — The ZenOS Way](#9-periodic-tasks--the-zenos-way)
 10. [Error Handling & Monitoring](#10-error-handling--monitoring)
 11. [Safety Features](#11-safety-features)
 12. [Advanced Tips & Tricks](#12-advanced-tips--tricks)
 13. [Common Patterns Cookbook](#13-common-patterns-cookbook)
+14. [Troubleshooting & FAQ](#14-troubleshooting--faq)
 
 ---
 
@@ -102,6 +103,12 @@ bool running = os_task_isActive(task_function);
 uint8_t state = os_task_get_state(task_function); // TaskState enum
 ```
 
+**Task states:**
+- `INACTIVE` — Task exists but is not scheduled
+- `READY` — Task is ready to run, waiting for CPU
+- `RUNNING` — Task is currently executing
+- `BLOCKED` — Task is waiting on an event, mutex, or delay
+
 > **💡 Tip:** Stopping a task does NOT free its memory — it's statically allocated. You can start/stop the same task as many times as you need. This is the primary mechanism for runtime task control.
 
 ### 2.3 Task Priority
@@ -119,6 +126,12 @@ uint8_t prio = os_get_task_priority(task_function);
 - 21+: ISR-like tasks (extremely time-critical)
 - 255: Reserved (do not use)
 
+**Priority rules:**
+1. Higher number = higher priority (255 is highest)
+2. The scheduler always runs the highest-priority ready task
+3. Equal-priority tasks are not round-robin scheduled — they must yield manually
+4. A task's priority can be temporarily boosted by IPC ceiling when holding a mutex
+
 ### 2.4 Periodic Tasks
 
 ```cpp
@@ -135,7 +148,7 @@ void task_sensor(void) {
 os_task_create(task_sensor, 3, 100);
 ```
 
-> **💡 Tip:** For periodic tasks, use `os_delay_ms()` at the end of each iteration. The scheduler will automatically wake the task at the next period boundary. See [Section 9](#9-periodic-tasks--the-zenos-way-no-software-timers) for a deep dive.
+> **💡 Tip:** For periodic tasks, use `os_delay_ms()` at the end of each iteration. The scheduler will automatically wake the task at the next period boundary. See [Section 9](#9-periodic-tasks--the-zenos-way) for a deep dive.
 
 ### 2.5 Stack Sizing Guide
 
@@ -148,7 +161,23 @@ os_task_create(task_sensor, 3, 100);
 | printf / float formatting | 1024–2048 bytes |
 | Complex application logic | 1024–2048 bytes |
 
-> **💡 Tip:** Use `os_get_stack_usage(task)` during development to measure actual peak usage, then set stack to ≥130% of peak.
+> **💡 Tip:** Use `os_get_stack_usage(task)` during development to measure actual peak usage, then set stack to ≥130% of peak. The 30% margin accounts for ISR nesting and compiler optimization differences.
+
+### 2.6 Task Naming (Debug)
+
+Tasks are automatically named by their function name (via template). You can check names in stack reports:
+
+```cpp
+#if OS_MONITOR_ENABLED
+    uint8_t count = os_get_stack_report_count();
+    for (uint8_t i = 0; i < count; i++) {
+        os_stack_report_entry_t rep;
+        os_get_stack_report(i, &rep);
+        uart_printf("[%d] %s: peak=%d/%d bytes\n",
+            rep.id, rep.name, rep.peak_bytes, rep.size_bytes);
+    }
+#endif
+```
 
 ---
 
@@ -161,6 +190,8 @@ os_delay_ms(100);  // Sleep for ~100ms, yield CPU to other tasks
 os_delay_ms(0);    // Immediate yield (gives other tasks a chance to run)
 ```
 
+**How it works:** `os_delay_ms()` sets a delay counter in the TCB and blocks the task. The scheduler wakes the task when the delay expires. During the delay, other ready tasks run.
+
 ### 3.2 Microsecond Delay (Busy-Wait)
 
 ```cpp
@@ -170,6 +201,10 @@ os_delay_us(1000);  // ~1ms busy-wait
 
 > **⚠️ Warning:** `os_delay_us()` uses the DWT cycle counter for busy-waiting. It does NOT yield the CPU. Use only for very short delays (< 1ms). For longer delays, use `os_delay_ms()`.
 
+**When to use each:**
+- `os_delay_ms()`: Task sleeps, other tasks run. Use for delays > 1ms.
+- `os_delay_us()`: CPU busy, nothing else runs. Use for sub-millisecond delays (bit-banging, precise timing).
+
 ### 3.3 Getting Current Time
 
 ```cpp
@@ -177,6 +212,11 @@ uint32_t ticks = os_get_tick();  // Raw tick count
 uint32_t ms    = os_get_ms();    // Milliseconds since boot
 uint32_t us    = os_get_us();    // Microseconds since boot (DWT cycle counter)
 ```
+
+**Resolution:**
+- `os_get_tick()`: 1 tick = `OS_KERNEL_TICK_PERIOD_US` microseconds (default 100µs)
+- `os_get_ms()`: Derived from ticks (1 tick = 10 ticks at 10kHz)
+- `os_get_us()`: DWT cycle counter (72MHz on STM32F103 → ~14ns resolution)
 
 ### 3.4 Timing Patterns
 
@@ -193,6 +233,18 @@ static uint32_t last_check = 0;
 if (os_get_ms() - last_check >= 100) {
     last_check = os_get_ms();
     // ... do periodic work ...
+}
+```
+
+**Timeout pattern:**
+```cpp
+uint32_t start = os_get_ms();
+while (!condition) {
+    if (os_get_ms() - start >= timeout_ms) {
+        // Timeout!
+        break;
+    }
+    os_delay_ms(1);
 }
 ```
 
@@ -242,6 +294,11 @@ OS_SAFE {
 // Interrupts re-enabled here
 ```
 
+You can check nesting depth with `os_in_safe()`:
+```cpp
+uint32_t depth = os_in_safe();  // 0 = outside, 1 = inside OS_SAFE, 2 = nested, etc.
+```
+
 ### 4.4 Duration Monitoring
 
 If `OS_SAFETY_MAX_CRITICAL_US` is configured (default 1000µs), a critical section that exceeds the limit triggers a `SAFE_TOO_LONG` error.
@@ -269,6 +326,34 @@ OS_SAFE {
 
 > **💡 Tip:** Use `OS_SAFE` only when you need to share data with interrupt handlers. For task-to-task synchronization, prefer `OS_LOCK` (mutex) — it doesn't block interrupts.
 
+### 4.6 Common Mistakes
+
+**Mistake 1: Using OS_SAFE with blocking calls**
+```cpp
+// ❌ WRONG — will trigger SAFE_DELAY_MS error
+OS_SAFE {
+    os_delay_ms(100);  // Can't block with interrupts disabled!
+}
+
+// ✅ CORRECT
+os_delay_ms(100);
+OS_SAFE {
+    shared_counter++;
+}
+```
+
+**Mistake 2: Forgetting to protect shared data**
+```cpp
+// ❌ WRONG — data race between task and ISR
+volatile uint32_t counter = 0;
+void task_func(void) { counter++; }
+void ISR_Handler(void) { counter++; }  // Counter can be corrupted!
+
+// ✅ CORRECT
+void task_func(void) { OS_SAFE { counter++; } }
+void ISR_Handler(void) { OS_SAFE { counter++; } }
+```
+
 ---
 
 ## 5. Events (OS_EVENT)
@@ -291,6 +376,8 @@ if (sensor_ready.wait(1000)) {  // Wait up to 1000ms
 read_sensor();
 sensor_ready.signal();  // Wake up the waiter
 ```
+
+**How it works:** Events use a counter. `signal()` increments the counter. `wait()` decrements it (if > 0) or blocks until signaled or timeout.
 
 ### 5.2 ISR-to-Task Signaling
 
@@ -330,6 +417,8 @@ evt.wait();    // count = 0 (returns 1)
 evt.wait();    // returns 0 (timeout — count was already 0)
 ```
 
+**Use case:** Multiple ISRs can signal the same event, and the task processes all pending signals.
+
 ### 5.4 Waiting for Multiple Events
 
 ```cpp
@@ -356,6 +445,8 @@ while (1) {
 - IDs 0–31: Full support (mask-based signaling, `|` operator)
 - IDs ≥ 32: Supported but must be signaled individually (no mask)
 - Practical limit: hundreds of events per system
+
+**Memory usage:** Each event uses ~32 bytes (ECB structure + pool entry).
 
 ---
 
@@ -406,6 +497,8 @@ OS_LOCK(mtx) {
     }
 }  // All three levels unlocked
 ```
+
+**How recursion works:** The mutex tracks `mutex_nesting` count in the TCB. Each lock increments it, each unlock decrements it. The mutex is only fully released when the count reaches 0.
 
 ### 6.4 IPC Ceiling (Priority Inheritance)
 
@@ -469,6 +562,12 @@ if (sensor_queue.get(value, 1000)) {  // Wait up to 1000ms
 }
 ```
 
+**How queues work internally:**
+- Circular buffer with `head` and `tail` pointers
+- Protected by internal mutex
+- Uses two events (`not_full`, `not_empty`) for blocking
+- FIFO order guaranteed
+
 ### 7.2 ISR-Safe Queue Operations
 
 ```cpp
@@ -527,6 +626,13 @@ OS_QUEUE<void*, 8> msg_queue;
 ```
 
 > **💡 Tip:** `OS_QUEUE` is a template — capacity is fixed at compile time. Choose capacity based on worst-case burst scenarios. Too small = producer blocked; too large = wasted RAM.
+
+### 7.5 Memory Usage
+
+Each queue uses:
+- `Capacity * sizeof(T)` bytes for the buffer
+- ~20 bytes for internal state (head, tail, count, mutex, events)
+- Total for `OS_QUEUE<int, 8>`: ~52 bytes
 
 ---
 
@@ -597,7 +703,7 @@ void task_process(void) {
 
 ---
 
-## 9. Periodic Tasks — The ZenOS Way (No Software Timers)
+## 9. Periodic Tasks — The ZenOS Way
 
 ### 9.1 Why No Software Timers?
 
@@ -667,9 +773,7 @@ void task_read_sensor(void) {
     while (1) {
         OS_LOCK(spi_mtx) {                    // Can use mutexes!
             uint16_t val = SPI_Read();         // Can use HAL freely
-            OS_QUEUE_LOCK(sensor_queue) {      // Can block on queue
-                sensor_queue.put(val);
-            }
+            sensor_queue.put(val);  // Queue is internally thread-safe
         }
         os_delay_ms(10);
     }
@@ -1018,6 +1122,27 @@ OS_QUEUE<uint16_t, 32> isr_data_queue;
 // In task: isr_data_queue.get(val, 100);
 ```
 
+### 12.6 Memory Map
+
+ZenOS uses static allocation only. Here's how memory is organized:
+
+```
+Flash (code + constants):
+├── Application code
+├── ZenOS kernel code
+├── STM32 HAL library
+└── Interrupt vector table
+
+SRAM (data + stacks):
+├── BSS segment (zero-initialized globals)
+├── Data segment (initialized globals)
+├── Task stacks (per-task, static)
+├── Event pool (OS_EVENT_POOL_SIZE * ~32 bytes)
+├── Error log (OS_MONITOR_ERROR_LOG_SIZE * ~8 bytes)
+├── Idle task stack (256 bytes)
+└── Fault task stack (192 bytes)
+```
+
 ---
 
 ## 13. Common Patterns Cookbook
@@ -1151,6 +1276,60 @@ void task_shutdown_handler(void) {
     }
 }
 ```
+
+---
+
+## 14. Troubleshooting & FAQ
+
+### Q: Task never runs / system hangs after os_start()
+
+**Checklist:**
+1. Did you call `os_init()` before `os_start()`?
+2. Did you create at least one task before `os_start()`?
+3. Is the task function signature `void task(void)` (no return value, no parameters)?
+4. Does the task have `while(1)` and yield periodically?
+
+### Q: Stack overflow detected
+
+**Solutions:**
+1. Increase stack size with `os_task_create_st(task, prio, period, larger_size)`
+2. Check for deep recursion or large local arrays
+3. Use `os_get_stack_usage()` to measure actual peak usage
+4. Verify stack size at the target optimization level (`-O2` may inline more)
+
+### Q: Priority inversion observed
+
+**Solutions:**
+1. Set the IPC ceiling correctly: `OS_MUTEX mtx(highest_user_priority)`
+2. Keep critical sections short
+3. Never hold a mutex while calling `os_delay_ms()` or blocking IPC
+
+### Q: ISR crashes / HardFault
+
+**Checklist:**
+1. Are you using `signal_from_isr()` instead of `signal()`?
+2. Are you using `put_from_isr()` instead of `put()`?
+3. Is the ISR stack large enough (check `OS_FAULT_STACK_SIZE`)?
+4. Are you accessing `volatile` variables from both ISR and task?
+
+### Q: Memory usage too high
+
+**Solutions:**
+1. Reduce `OS_KERNEL_STACK_SIZE` (but verify with stack report)
+2. Disable unused features in `ZenOS_Config.hpp`:
+   ```cpp
+   #define OS_TOOL_QUEUE        0  // Disable if not using queues
+   #define OS_MONITOR_DEADLINE  0  // Disable if not using deadlines
+   ```
+3. Reduce `OS_MONITOR_ERROR_LOG_SIZE` if error log is not needed
+
+### Q: Timing inaccurate
+
+**Solutions:**
+1. Verify `SystemCoreClock` matches your actual clock configuration
+2. Check `OS_KERNEL_TICK_PERIOD_US` — must divide 1000 evenly
+3. Use drift compensation for precise periodic tasks (see Section 9.4)
+4. Higher-priority tasks will preempt — ensure your task has sufficient priority
 
 ---
 

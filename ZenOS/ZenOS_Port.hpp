@@ -6,7 +6,7 @@
  * Auto-detects MCU family from CMSIS defines.
  * Provides: vector count, register addresses, compiler attributes.
  *
- * @author  Rahman Heidari (rahman.h22@gmail.com)
+ * @author  Raymon Research Group (rahman.h22@gmail.com)
  * @version 1.0.0
  */
 

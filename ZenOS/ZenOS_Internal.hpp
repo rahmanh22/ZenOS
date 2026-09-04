@@ -7,7 +7,7 @@
  * declarations for functions and globals shared across the split
  * translation units (scheduler, IPC, safety, monitor).
  *
- * @author  Rahman Heidari (rahman.h22@gmail.com)
+ * @author  Raymon Research Group (rahman.h22@gmail.com)
  * @version 1.0.0
  */
 
