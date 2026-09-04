@@ -6,7 +6,7 @@
  * Contains: priority bitmap, priority queues, task create/stop/start/lookup,
  *           task reset, task exit, wake/block helpers, tickless processing.
  *
- * @author  Raymon Research Group (rahman.h22@gmail.com)
+ * @author  Rahman Heidari <rahman.h22@gmail.com> — Raymon Research Team
  * @version 1.0.0
  */
 

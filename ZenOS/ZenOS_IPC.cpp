@@ -6,7 +6,7 @@
  * Contains: event register/unregister/signal/wait,
  *           mutex block/handoff, OS_EVENT/OS_MUTEX/OS_LOCK_GUARD/OS_SAFE_GUARD.
  *
- * @author  Raymon Research Group (rahman.h22@gmail.com)
+ * @author  Rahman Heidari <rahman.h22@gmail.com> — Raymon Research Team
  * @version 1.0.0
  */
 

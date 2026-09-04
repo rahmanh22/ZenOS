@@ -200,34 +200,20 @@ Your donation directly funds development, testing, certification, and documentat
 
 <table>
 <tr>
-<td align="center" width="50%">
+<td align="center">
 
-<sup>
-
-**🟠 Bitcoin (BTC)**
-
-</sup>
-
-<code style="font-size: 1.4em; font-weight: bold; color: #f7931a;  ">
+🟠 **Bitcoin (BTC)**
 
 `bc1qd39vgmnweuzh5hp2cqm4cnh782xga6wph3v650`
 
-</code>
-
 </td>
-<td align="center" width="50%">
+</tr>
+<tr>
+<td align="center">
 
-<sup>
-
-**🔵 Ethereum (ETH) / USDT (ERC-20)**
-
-</sup>
-
-<code style="font-size: 1.4em; font-weight: bold; color: #f7931a;  ">
+🔵 **Ethereum (ETH) / USDT (ERC-20)**
 
 `0x1C21c39324F65a38Fb8de9ccB92aB01FdeD1534C`
-
-</code>
 
 </td>
 </tr>
@@ -254,7 +240,7 @@ Your donation directly funds development, testing, certification, and documentat
 
 ## 📬 Contact
 
-**Raymon Research Group** — Rahman Heidari
+**Raymon Research Team** — Rahman Heidari
 
 📧 Email: [rahman.h22@gmail.com](mailto:rahman.h22@gmail.com)
 

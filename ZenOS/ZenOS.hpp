@@ -6,7 +6,7 @@
  * Safe to include from both C and C++ files.
  * C++ features (enums, classes, templates) are guarded by __cplusplus.
  *
- * @author  Raymon Research Group (rahman.h22@gmail.com)
+ * @author  Rahman Heidari <rahman.h22@gmail.com> — Raymon Research Team
  * @version 1.0.0
  */
 

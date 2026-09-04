@@ -4,7 +4,7 @@
  * @file    ZenOS_c.h
  * @brief   Thin C wrapper for ZenOS — use from .c files only
  *
- * @author  Raymon Research Group (rahman.h22@gmail.com)
+ * @author  Rahman Heidari <rahman.h22@gmail.com> — Raymon Research Team
  * @version 1.0.0
  *
  * Declares every ZenOS function callable from C. For C++ code include

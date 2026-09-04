@@ -200,34 +200,20 @@ int main(void) {
 
 <table>
 <tr>
-<td align="center" width="50%">
+<td align="center">
 
-<sup>
-
-**🟠 بیت‌کوین (BTC)**
-
-</sup>
-
-<code style="font-size: 1.4em; font-weight: bold; color: #f7931a;  ">
+🟠 **بیت‌کوین (BTC)**
 
 `bc1qd39vgmnweuzh5hp2cqm4cnh782xga6wph3v650`
 
-</code>
-
 </td>
-<td align="center" width="50%">
+</tr>
+<tr>
+<td align="center">
 
-<sup>
-
-**🔵 اتریوم (ETH) / تتر (USDT - ERC-20)**
-
-</sup>
-
-<code style="font-size: 1.4em; font-weight: bold; color: #f7931a;  ">
+🔵 **اتریوم (ETH) / تتر (USDT - ERC-20)**
 
 `0x1C21c39324F65a38Fb8de9ccB92aB01FdeD1534C`
-
-</code>
 
 </td>
 </tr>
@@ -257,7 +243,7 @@ int main(void) {
 
 <div dir="rtl">
 
-**گروه علمی و تحقیقاتی رایمون** — Rahman Heidari
+**تیم تحقیقاتی رایمون** — Rahman Heidari
 
 📧 ایمیل: [rahman.h22@gmail.com](mailto:rahman.h22@gmail.com)
 

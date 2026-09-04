@@ -34,7 +34,7 @@
  *   [IND-3]  Industrial IEC 61508 SIL 3 — high-integrity fault tolerance
  *   [IND-4]  Industrial IEC 61508 SIL 4 — highest-integrity (rare in SW)
  *
- * @author  Raymon Research Group (rahman.h22@gmail.com)
+ * @author  Rahman Heidari <rahman.h22@gmail.com> — Raymon Research Team
  * @version 1.0.0
  */
 
