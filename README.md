@@ -207,7 +207,7 @@ Your donation directly funds development, testing, certification, and documentat
 
 </sup>
 
-<code style="font-size: 1.4em; font-weight: bold; color: #f7931a; background: #1a1a2e; padding: 8px 16px; border-radius: 8px;">
+<code style="font-size: 1.4em; font-weight: bold; color: #f7931a;  ">
 
 `bc1qd39vgmnweuzh5hp2cqm4cnh782xga6wph3v650`
 
@@ -222,7 +222,7 @@ Your donation directly funds development, testing, certification, and documentat
 
 </sup>
 
-<code style="font-size: 1.4em; font-weight: bold; color: #627eea; background: #1a1a2e; padding: 8px 16px; border-radius: 8px;">
+<code style="font-size: 1.4em; font-weight: bold; color: #f7931a;  ">
 
 `0x1C21c39324F65a38Fb8de9ccB92aB01FdeD1534C`
 
