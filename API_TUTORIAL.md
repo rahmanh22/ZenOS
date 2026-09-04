@@ -1,7 +1,5 @@
 # ZenOS RTOS — Complete API Tutorial & Cookbook
 
-> **Simplicity — Safety — Speed**
-
 **Version:** 1.0.0 | **Platform:** ARM Cortex-M (STM32) | **Language:** C++11 / C
 
 ---
@@ -876,13 +874,13 @@ OSError last = os_get_last_error();
 
 ### 10.2 Suppressing Expected Errors
 
-During testing, you may deliberately trigger errors. Use `os_error_expect_begin()`/`os_error_expect_end()` to exclude them from the unexpected count:
+During testing, you may deliberately trigger errors. Use `OS_ERROR_EXPECTED` to exclude them from the unexpected count:
 
 ```cpp
 // In test code:
-os_error_expect_begin();
+OS_ERROR_EXPECTED {
     os_event_signal(-1);  // Deliberately invalid — expected error
-os_error_expect_end();
+}
 // os_get_unexpected_error_count() does NOT increase
 ```
 
@@ -1343,7 +1341,6 @@ void task_shutdown_handler(void) {
 |----------|-------------|
 | `os_init()` | Initialize RTOS (call before task creation) |
 | `os_start()` | Start scheduler (never returns) |
-| `os_tick()` | Timer ISR handler (call from SysTick/TIM IRQ) |
 | `os_delay_ms(ms)` | Sleep for `ms` milliseconds |
 | `os_delay_us(us)` | Busy-wait for `us` microseconds |
 | `os_yield()` | Yield to next ready task |
@@ -1355,56 +1352,6 @@ void task_shutdown_handler(void) {
 | `os_task_isActive(entry)` | Check if task is active |
 | `os_get_task_count()` | Get number of registered tasks |
 | `os_get_task_priority(entry)` | Get task's active priority |
-| `os_get_version()` | Get packed version number |
-| `os_get_version_string()` | Get version string (e.g. "1.0.0") |
-
-### Critical Section (C)
-
-| Function | Description |
-|----------|-------------|
-| `os_critical_enter()` | Disable interrupts, return saved state |
-| `os_critical_exit(old)` | Restore interrupt state |
-| `os_in_safe()` | Check if inside `OS_SAFE` block (returns depth) |
-
-### Error Handling (C)
-
-| Function | Description |
-|----------|-------------|
-| `os_report_error(code)` | Report an error |
-| `os_get_last_error()` | Get last error code |
-| `os_get_error_count()` | Total error count |
-| `os_get_expected_error_count()` | Expected errors (suppressed) |
-| `os_get_unexpected_error_count()` | Unexpected errors |
-| `os_error_expect_begin()` | Start expected-error region |
-| `os_error_expect_end()` | End expected-error region |
-
-### Monitoring (C) — requires `OS_MONITOR_ENABLED`
-
-| Function | Description |
-|----------|-------------|
-| `os_get_stack_usage(entry)` | Peak stack usage (bytes) |
-| `os_get_stack_report_count()` | Number of tasks in report |
-| `os_get_stack_report(i, &out)` | Fill stack report entry |
-| `os_get_cpu_usage_total()` | Total CPU usage (0–100%) |
-| `os_get_task_cpu_usage(entry)` | Per-task CPU usage |
-| `os_task_set_deadline(entry, ms)` | Set task deadline (requires `OS_MONITOR_DEADLINE`) |
-| `os_get_deadline_miss_count(entry)` | Missed deadline count |
-| `os_get_error_log_count()` | Error log entries available |
-| `os_get_error_log_entry(i)` | Read error log entry |
-
-### Safety (C) — each requires its config macro
-
-| Function | Config | Description |
-|----------|--------|-------------|
-| `os_hw_watchdog_feed()` | `OS_SAFETY_HW_WATCHDOG` | Unconditional watchdog feed |
-| `os_hw_watchdog_check()` | `OS_SAFETY_HW_WATCHDOG` | Conditional feed (healthy only) |
-| `os_ram_test_step()` | `OS_SAFETY_RAM_TEST` | Test one RAM word |
-| `os_ram_test_complete()` | `OS_SAFETY_RAM_TEST` | Check if test finished |
-| `os_crc_init()` | `OS_SAFETY_CRC_CHECK` | Compute expected CRC at boot |
-| `os_crc_check_step()` | `OS_SAFETY_CRC_CHECK` | Check one flash block |
-| `os_mpu_init()` | `OS_SAFETY_MPU` | Initialize MPU |
-| `os_mpu_enable()` | `OS_SAFETY_MPU` | Enable MPU |
-| `os_mpu_disable()` | `OS_SAFETY_MPU` | Disable MPU |
 
 ### RAII Classes (C++)
 

@@ -2,9 +2,9 @@
 
 # ⚡ ZenOS
 
-> **Simplicity — Safety — Speed**
-
 **RT operating system for ARM Cortex-M — written in C++11.**
+
+### **Simplicity — Security — Speed**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-1.0.0-green.svg?style=for-the-badge)]()
@@ -19,7 +19,6 @@
 
 <br>
 
-*ZenOS — fewer lines, fewer headaches.*
 
 </div>
 
@@ -31,7 +30,7 @@ The word *Zen* means clarity through simplicity — stripping away the unnecessa
 
 ZenOS handles the hard parts of embedded systems — scheduling, synchronization, memory protection, fault recovery — so you can focus on your actual application. Most things that would normally take dozens of lines of setup code are reduced to a single function call. The kernel figures out the rest.
 
-It's built for ARM Cortex-M (M3, M4, M7) on STM32, and it ships with safety mechanisms: stack checking, MPU protection, watchdogs, CRC verification, and deadline monitoring. They're disabled by default — enable them with `-D` flags. If you're targeting medical or industrial products, you can enforce IEC 62304 or IEC 61508 compliance at compile time — the build itself will tell you if something's missing.
+It's built for ARM Cortex-M (M3, M4, M7) on STM32, and it carries a set of safety mechanisms out of the box: stack checking, MPU protection, watchdogs, CRC verification, and deadline monitoring. If you're targeting medical or industrial products, you can enforce IEC 62304 or IEC 61508 compliance at compile time — the build itself will tell you if something's missing.
 
 > **No heap. No hidden allocations. No surprises.**
 
@@ -142,7 +141,7 @@ For the full API guide → [API_TUTORIAL.md](API_TUTORIAL.md) | [راهنمای 
 
 ## 🛡️ Safety Features
 
-All mechanisms are **disabled by default** for minimal footprint. Enable them in `ZenOS_Config.hpp` via `-D` flags. Use `-DOS_TARGET_MEDICAL=2` or `-DOS_TARGET_INDUSTRIAL=3` for compile-time enforcement.
+All mechanisms are **enabled by default** and can be individually toggled in `ZenOS_Config.hpp`.
 
 | Mechanism | Config Macro | What it does |
 |:----------|:-------------|:-------------|
@@ -193,7 +192,7 @@ Writing good documentation takes time. Answering issues takes time. Both matter.
 </tr>
 </table>
 
-### 💸 Donate
+## 💸 Donate
 
 Your donation directly funds development, testing, certification, and documentation.
 
@@ -273,6 +272,6 @@ For questions, suggestions, or collaboration opportunities, feel free to reach o
 
 <br>
 
-*ZenOS — fewer lines, fewer headaches.*
+*ZenOS — (Simplicity , Security , Speed)*
 
 </div>

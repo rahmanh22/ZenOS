@@ -1,7 +1,5 @@
 # ZenOS RTOS — Safety Manual
 
-> **Simplicity — Safety — Speed**
-
 **Version:** 1.0.0  
 **Date:** September 2026  
 **Author:** Raymon Research Group — گروه علمی و تحقیقاتی رایمون (rahman.h22@gmail.com)  
@@ -50,7 +48,7 @@ ZenOS is a preemptive, priority-based real-time operating system for ARM Cortex-
 
 ## 3. Safety Mechanisms
 
-ZenOS provides the following compile-time configurable safety mechanisms. Most are **disabled by default** to minimize footprint and can be individually enabled via `-D` flags in `ZenOS_Config.hpp`. Use the enforcement macros (`-DOS_TARGET_MEDICAL`, `-DOS_TARGET_INDUSTRIAL`) to auto-enable required features.
+ZenOS provides the following compile-time configurable safety mechanisms. All are enabled by default in `ZenOS_Config.hpp` and can be individually disabled.
 
 ### 3.1 Stack Overflow Detection (`OS_SAFETY_SOFT_WATCHDOG`)
 
@@ -294,28 +292,24 @@ All configurable constants are in `ZenOS_Config.hpp`. Override them via compiler
 
 | Constant | Default | Description |
 |---|---|---|
-| `OS_MONITOR_DEADLINE` | 0 | Enable deadline monitoring |
-| `OS_MONITOR_TCB_INTEGRITY` | 0 | Enable TCB magic-number check |
+| `OS_MONITOR_DEADLINE` | 1 | Enable deadline monitoring |
+| `OS_MONITOR_TCB_INTEGRITY` | 1 | Enable TCB magic-number check |
 | `OS_MONITOR_ERROR_LOG` | 1 | Enable error log ring buffer |
 | `OS_MONITOR_ERROR_LOG_SIZE` | 32 | Error log capacity (entries) |
-
-> **Note:** `OS_MONITOR_DEADLINE` and `OS_MONITOR_TCB_INTEGRITY` are disabled by default to minimize footprint. They are **required** for IEC 62304 Class B/C and IEC 61508 SIL 2+.
 
 ### 6.4 Safety
 
 | Constant | Default | Range | Description |
 |---|---|---|---|
-| `OS_SAFETY_RAM_TEST` | 0 | 0/1 | Background March C- SRAM test |
-| `OS_SAFETY_MPU` | 0 | 0/1 | Hardware MPU per-task protection |
-| `OS_SAFETY_HW_WATCHDOG` | 0 | 0/1 | IWDG integration |
-| `OS_SAFETY_CRC_CHECK` | 0 | 0/1 | Flash CRC integrity check |
-| `OS_SAFETY_SOFT_WATCHDOG` | 0 | 0/1 | Software stuck-task detection |
+| `OS_SAFETY_RAM_TEST` | 1 | 0/1 | Background March C- SRAM test |
+| `OS_SAFETY_MPU` | 1 | 0/1 | Hardware MPU per-task protection |
+| `OS_SAFETY_HW_WATCHDOG` | 1 | 0/1 | IWDG integration |
+| `OS_SAFETY_CRC_CHECK` | 1 | 0/1 | Flash CRC integrity check |
+| `OS_SAFETY_SOFT_WATCHDOG` | 1 | 0/1 | Software stuck-task detection |
 | `OS_SAFETY_DEADLINE_ACTION` | 1 | 0/1/2 | 0=log, 1=reset, 2=disable on deadline miss |
 | `OS_SAFETY_TASK_MAX_RECOVERY` | 3 | ≥0 | Max stack recovery attempts before permanent disable |
 | `OS_SAFETY_SOFT_WDG_TIMEOUT_MS` | 3000 | >0 | Software watchdog timeout (ms) |
 | `OS_SAFETY_MAX_CRITICAL_US` | 1000 | >0 | Max duration inside `OS_SAFE` (µs) |
-
-> **Note:** All safety features except `DEADLINE_ACTION`, `TASK_MAX_RECOVERY`, `SOFT_WDG_TIMEOUT_MS`, and `MAX_CRITICAL_US` are disabled by default (`0`). Enable them explicitly in `ZenOS_Config.hpp` via `-D` flags, or use the enforcement macros (`-DOS_TARGET_MEDICAL`, `-DOS_TARGET_INDUSTRIAL`) to auto-enable required features.
 
 ### 6.5 Safety Standard Enforcement (IEC 62304 / IEC 61508)
 
@@ -328,11 +322,11 @@ Set these macros via compiler `-D` flags. **Do not define them in `ZenOS_Config.
 ```bash
 # IEC 62304 — Medical device software lifecycle
 # Values: 0 (disabled), 1 (Class A), 2 (Class B), 3 (Class C)
--DOS_TARGET_MEDICAL=2
+-DMEDICAL=2
 
 # IEC 61508 — Industrial functional safety
 # Values: 0 (disabled), 1 (SIL 1), 2 (SIL 2), 3 (SIL 3), 4 (SIL 4)
--DOS_TARGET_INDUSTRIAL=3
+-DINDUSTRIAL=3
 ```
 
 Both macros can be combined — the **stricter** requirement applies.
@@ -391,21 +385,21 @@ The tables below show which configuration options **must** be enabled for each s
 
 **Medical Class C (life-critical device):**
 ```makefile
-CFLAGS += -DOS_TARGET_MEDICAL=3
-# All safety features must be enabled.
+CFLAGS += -DMEDICAL=3
+# All safety features must be enabled (default).
 # If any is disabled, the build will fail.
 ```
 
 **Industrial SIL 2 (process control):**
 ```makefile
-CFLAGS += -DOS_TARGET_INDUSTRIAL=2
+CFLAGS += -DINDUSTRIAL=2
 # Requires: DEADLINE, MUTEX, HW_WATCHDOG, ERROR_LOG,
 #           SOFT_WATCHDOG, DEADLINE_ACTION ≥ 1
 ```
 
 **Medical Class C + Industrial SIL 3 combined:**
 ```makefile
-CFLAGS += -DOS_TARGET_MEDICAL=3 -DOS_TARGET_INDUSTRIAL=3
+CFLAGS += -DMEDICAL=3 -DINDUSTRIAL=3
 # The union of both requirements applies.
 # All safety features must be enabled.
 ```
@@ -413,13 +407,13 @@ CFLAGS += -DOS_TARGET_MEDICAL=3 -DOS_TARGET_INDUSTRIAL=3
 **Non-safety application (no enforcement):**
 ```makefile
 # Neither macro defined — all features optional.
-# CFLAGS += (no -DOS_TARGET_MEDICAL= or -DOS_TARGET_INDUSTRIAL= needed)
+# CFLAGS += (no -DMEDICAL= or -DINDUSTRIAL= needed)
 ```
 
 #### 6.5.6 Important Notes
 
 - **This is not certification.** The macros enforce *configuration completeness*, not compliance. The integrator must still perform the full safety lifecycle (risk analysis, V&V, documentation) per the applicable standard.
-- **Default values do NOT satisfy safety levels.** Most safety features are disabled by default. You must explicitly enable them (via `-D` flags) or set the enforcement macros to auto-enable required features.
+- **Default values already satisfy all levels.** Since all safety features are enabled by default, the macros will only trigger `#error` if you *disable* a feature that the standard requires.
 - **The macros validate only configuration.** They do not verify runtime behavior, task timing analysis, or stack sizing — these must be validated separately.
 - **IEC 62304 §5.5** requires that safety-related software changes be subject to configuration management. Changing these macros constitutes a configuration change that must be documented.
 
