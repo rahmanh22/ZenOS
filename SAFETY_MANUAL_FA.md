@@ -195,12 +195,12 @@ ZenOS مکانیسم‌های ایمنی زیر را ارائه می‌دهد. �
 | `OS_SAFETY_HW_WATCHDOG` | 0 | 0/1 | ادغام IWDG |
 | `OS_SAFETY_CRC_CHECK` | 0 | 0/1 | بررسی یکپارچگی فلش |
 | `OS_SAFETY_SOFT_WATCHDOG` | 0 | 0/1 | تشخیص تسک گیر کرده نرم‌افزاری |
-
-> **توجه:** تمام ویژگی‌های ایمنی به‌صورت پیش‌فرض غیرفعال (`0`) هستند. آنها را صریحاً در `ZenOS_Config.hpp` با پرچم‌های `-D` فعال کنید، یا از ماکروهای اجرا (`-DOS_TARGET_MEDICAL`، `-DOS_TARGET_INDUSTRIAL`) استفاده کنید.
 | `OS_SAFETY_DEADLINE_ACTION` | 1 | 0/1/2 | 0=ثبت، 1=ریست، 2=غیرفعال در تأخیر ددلاین |
 | `OS_SAFETY_TASK_MAX_RECOVERY` | 3 | ≥0 | حداکثر تلاش بازیابی پشته قبل از غیرفعال‌سازی دائمی |
 | `OS_SAFETY_SOFT_WDG_TIMEOUT_MS` | 3000 | >0 | تایم‌اوت تایمر نرم‌افزاری (ms) |
 | `OS_SAFETY_MAX_CRITICAL_US` | 1000 | >0 | حداکثر مدت در OS_SAFE (µs) |
+
+> **توجه:** تمام ویژگی‌های ایمنی به‌جز `DEADLINE_ACTION`، `TASK_MAX_RECOVERY`، `SOFT_WDG_TIMEOUT_MS` و `MAX_CRITICAL_US` به‌صورت پیش‌فرض غیرفعال (`0`) هستند. آنها را صریحاً در `ZenOS_Config.hpp` با پرچم‌های `-D` فعال کنید، یا از ماکروهای اجرا (`-DOS_TARGET_MEDICAL`، `-DOS_TARGET_INDUSTRIAL`) استفاده کنید.
 
 ### ۶.۵ اجرای استاندارد ایمنی (IEC 62304 / IEC 61508)
 

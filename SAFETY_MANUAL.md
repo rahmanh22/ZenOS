@@ -310,12 +310,12 @@ All configurable constants are in `ZenOS_Config.hpp`. Override them via compiler
 | `OS_SAFETY_HW_WATCHDOG` | 0 | 0/1 | IWDG integration |
 | `OS_SAFETY_CRC_CHECK` | 0 | 0/1 | Flash CRC integrity check |
 | `OS_SAFETY_SOFT_WATCHDOG` | 0 | 0/1 | Software stuck-task detection |
-
-> **Note:** All safety features are disabled by default (`0`). Enable them explicitly in `ZenOS_Config.hpp` via `-D` flags, or use the enforcement macros (`-DOS_TARGET_MEDICAL`, `-DOS_TARGET_INDUSTRIAL`) to auto-enable required features.
 | `OS_SAFETY_DEADLINE_ACTION` | 1 | 0/1/2 | 0=log, 1=reset, 2=disable on deadline miss |
 | `OS_SAFETY_TASK_MAX_RECOVERY` | 3 | ≥0 | Max stack recovery attempts before permanent disable |
 | `OS_SAFETY_SOFT_WDG_TIMEOUT_MS` | 3000 | >0 | Software watchdog timeout (ms) |
 | `OS_SAFETY_MAX_CRITICAL_US` | 1000 | >0 | Max duration inside `OS_SAFE` (µs) |
+
+> **Note:** All safety features except `DEADLINE_ACTION`, `TASK_MAX_RECOVERY`, `SOFT_WDG_TIMEOUT_MS`, and `MAX_CRITICAL_US` are disabled by default (`0`). Enable them explicitly in `ZenOS_Config.hpp` via `-D` flags, or use the enforcement macros (`-DOS_TARGET_MEDICAL`, `-DOS_TARGET_INDUSTRIAL`) to auto-enable required features.
 
 ### 6.5 Safety Standard Enforcement (IEC 62304 / IEC 61508)
 

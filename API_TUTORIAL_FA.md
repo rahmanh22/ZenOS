@@ -770,13 +770,13 @@ OSError last = os_get_last_error();
 
 ### ۱۰.۲ سرکوب خطاهای مورد انتظار
 
-در زمان تست، ممکن است عمداً خطا ایجاد کنید. از `OS_ERROR_EXPECTED` استفاده کنید تا آن‌ها را از شمارنده غیرمنتظره حذف کنید:
+در زمان تست، ممکن است عمداً خطا ایجاد کنید. از `os_error_expect_begin()`/`os_error_expect_end()` استفاده کنید تا آن‌ها را از شمارنده غیرمنتظره حذف کنید:
 
 ```cpp
 // در کد تست:
-OS_ERROR_EXPECTED {
+os_error_expect_begin();
     os_event_signal(-1);  // عمداً نامعتبر — خطای مورد انتظار
-}
+os_error_expect_end();
 // os_get_unexpected_error_count() افزایش نمی‌یابد
 ```
 
@@ -1162,6 +1162,7 @@ void task_shutdown_handler(void) {
 |------|--------|
 | `os_init()` | راه‌اندازی سیستم‌عامل (قبل از ایجاد تسک فراخوانی شود) |
 | `os_start()` | شروع زمان‌بند (هرگز برنمی‌گردد) |
+| `os_tick()` | وقفه تایمر (از SysTick/TIM IRQ فراخوانی شود) |
 | `os_delay_ms(ms)` | خواب به مدت `ms` میلی‌ثانیه |
 | `os_delay_us(us)` | انتظار شلوغ به مدت `us` میکروثانیه |
 | `os_yield()` | واگذاری به تسک آماده بعدی |
@@ -1173,6 +1174,56 @@ void task_shutdown_handler(void) {
 | `os_task_isActive(entry)` | بررسی فعال بودن تسک |
 | `os_get_task_count()` | دریافت تعداد تسک‌های ثبت‌شده |
 | `os_get_task_priority(entry)` | دریافت اولویت فعال تسک |
+| `os_get_version()` | دریافت شماره نسخه بسته‌بندی‌شده |
+| `os_get_version_string()` | دریافت رشته نسخه (مثلاً "1.0.0") |
+
+### بخش حیاتی (C)
+
+| تابع | توضیح |
+|------|--------|
+| `os_critical_enter()` | غیرفعال‌سازی وقفه‌ها، برگرداندن وضعیت ذخیره‌شده |
+| `os_critical_exit(old)` | بازیابی وضعیت وقفه |
+| `os_in_safe()` | بررسی داخل بلوک `OS_SAFE` (عمق را برمی‌گرداند) |
+
+### مدیریت خطا (C)
+
+| تابع | توضیح |
+|------|--------|
+| `os_report_error(code)` | گزارش خطا |
+| `os_get_last_error()` | دریافت آخرین کد خطا |
+| `os_get_error_count()` | تعداد کل خطاها |
+| `os_get_expected_error_count()` | خطاهای مورد انتظار (حذف‌شده) |
+| `os_get_unexpected_error_count()` | خطاهای غیرمنتظره |
+| `os_error_expect_begin()` | شروع ناحیه خطای مورد انتظار |
+| `os_error_expect_end()` | پایان ناحیه خطای مورد انتظار |
+
+### پایش (C) — نیاز به `OS_MONITOR_ENABLED`
+
+| تابع | توضیح |
+|------|--------|
+| `os_get_stack_usage(entry)` | اوج مصرف پشته (بایت) |
+| `os_get_stack_report_count()` | تعداد تسک‌ها در گزارش |
+| `os_get_stack_report(i, &out)` | پر کردن ورودی گزارش پشته |
+| `os_get_cpu_usage_total()` | مصرف کل CPU (0–100%) |
+| `os_get_task_cpu_usage(entry)` | مصرف CPU هر تسک |
+| `os_task_set_deadline(entry, ms)` | تنظیم ددلاین تسک (نیاز به `OS_MONITOR_DEADLINE`) |
+| `os_get_deadline_miss_count(entry)` | تعداد ددلاین از دست رفته |
+| `os_get_error_log_count()` | تعداد ورودی‌های موجود در ثبت خطا |
+| `os_get_error_log_entry(i)` | خواندن ورودی ثبت خطا |
+
+### ایمنی (C) — هر کدام نیاز به ماکرو پیکربندی خود دارد
+
+| تابع | ماکرو | توضیح |
+|------|--------|--------|
+| `os_hw_watchdog_feed()` | `OS_SAFETY_HW_WATCHDOG` | تغذیه بدون قید و شرط watchdog |
+| `os_hw_watchdog_check()` | `OS_SAFETY_HW_WATCHDOG` | تغذیه مشروط (فقط سالم) |
+| `os_ram_test_step()` | `OS_SAFETY_RAM_TEST` | آزمایش یک کلمه RAM |
+| `os_ram_test_complete()` | `OS_SAFETY_RAM_TEST` | بررسی اتمام آزمون |
+| `os_crc_init()` | `OS_SAFETY_CRC_CHECK` | محاسبه CRC مورد انتظار در زمان بوت |
+| `os_crc_check_step()` | `OS_SAFETY_CRC_CHECK` | بررسی یک بلوک فلش |
+| `os_mpu_init()` | `OS_SAFETY_MPU` | راه‌اندازی MPU |
+| `os_mpu_enable()` | `OS_SAFETY_MPU` | فعال‌سازی MPU |
+| `os_mpu_disable()` | `OS_SAFETY_MPU` | غیرفعال‌سازی MPU |
 
 ### کلاس‌های RAII (C++)
 
