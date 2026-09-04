@@ -2,10 +2,13 @@
 
 **Version:** 1.0.0 | **Platform:** ARM Cortex-M (STM32) | **Language:** C++11 / C
 
+> **📝 Note:** All examples and sample code in this tutorial are written for **STM32F103C8T6** (Blue Pill, Cortex-M3, 72MHz, 64KB Flash, 20KB RAM). The code is portable to other STM32 families — just adjust pin names and peripheral handles to match your board.
+
 ---
 
 ## Table of Contents
 
+0. [Getting Started (Beginner's Guide)](#0-getting-started-beginners-guide)
 1. [Quick Start](#1-quick-start)
 2. [Task Management](#2-task-management)
 3. [Timing & Delays](#3-timing--delays)
@@ -20,6 +23,372 @@
 12. [Advanced Tips & Tricks](#12-advanced-tips--tricks)
 13. [Common Patterns Cookbook](#13-common-patterns-cookbook)
 14. [Troubleshooting & FAQ](#14-troubleshooting--faq)
+
+---
+
+## 0. Getting Started (Beginner's Guide)
+
+> **📝 Note:** This section is for beginners who have never used STM32 or ZenOS before. If you're already familiar with CubeMX and ARM development, skip to [Section 1](#1-quick-start).
+
+### 0.1 Prerequisites — What You Need to Know
+
+Before starting, you should have basic knowledge of:
+
+| Topic | Level | Resources |
+|-------|-------|-----------|
+| **C/C++ programming** | Basic | Variables, functions, loops, pointers |
+| **What is an RTOS?** | Basic | Tasks, scheduling, priorities |
+| **ARM Cortex-M** | Optional | Helpful but not required — ZenOS abstracts the hardware |
+
+> **💡 Don't worry if you don't know embedded programming.** ZenOS handles the hard parts (scheduling, interrupts, memory protection). You just write tasks.
+
+### 0.2 Hardware You Need
+
+| Item | Specification | Where to Buy |
+|------|--------------|--------------|
+| **STM32F103C8T6 board** | "Blue Pill" — ~$2 | AliExpress, Amazon |
+| **ST-Link V2 debugger** | ~$3 | AliExpress, Amazon |
+| **USB cable** | Micro-USB (for power + UART) | Any electronics shop |
+| **Jumper wires** | Male-to-female, 10+ pcs | Any electronics shop |
+| **LED + resistor** | 220Ω–1kΩ (for testing) | Any electronics shop |
+
+**Optional but recommended:**
+- USB-to-UART adapter (CH340G or CP2102) — for serial output
+- Breadboard — for prototyping
+
+**Total cost: ~$10**
+
+```
+┌─────────────────────────────────────────────────┐
+│              Hardware Setup                      │
+│                                                  │
+│   [ST-Link V2]  ←→  [Blue Pill STM32F103C8]    │
+│       SWD              Micro-USB                 │
+│                          ↓                       │
+│                    [PC USB Port]                 │
+│                                                  │
+│   Optional:                                      │
+│   [CH340G USB-UART] ←→ [PA9/PA10 on Blue Pill]  │
+└─────────────────────────────────────────────────┘
+```
+
+### 0.3 Software Installation
+
+#### Step 1: Install STM32CubeIDE
+
+1. Go to [https://www.st.com/en/development-tools/stm32cubeide.html](https://www.st.com/en/development-tools/stm32cubeide.html)
+2. Download and install (free, ~2GB)
+3. Create a free ST account if prompted
+
+> **💡 Alternative:** You can also use **PlatformIO** (VS Code extension) if you prefer.
+
+#### Step 2: Install ST-Link Drivers
+
+1. Download ST-Link Utility from ST website
+2. Or install via your IDE (STM32CubeIDE includes drivers)
+
+#### Step 3: Verify Installation
+
+1. Connect Blue Pill via USB
+2. Open Device Manager (Windows) — should see `STMicroelectronics STLink` or `USB Serial Device`
+3. If not detected, install drivers manually
+
+### 0.4 Create Your First CubeMX Project
+
+#### Step 1: Open STM32CubeIDE → File → New → STM32 Project
+
+#### Step 2: Select MCU
+- In the MCU Selector, type `STM32F103C8`
+- Select `STM32F103C8T6` (LQFP48 package)
+- Click "Start Project"
+
+#### Step 3: Configure Clock
+- Go to **Clock Configuration** tab
+- Set **HCLK** to `72 MHz`
+- Click "OK" if CubeMX suggests using PLL
+
+#### Step 4: Configure GPIO (for LED)
+- Go to **Pinout & Configuration** tab
+- Click on `PC13` (Blue Pill built-in LED)
+- Set as `GPIO_Output`
+
+#### Step 5: Configure TIM1 (for HAL timebase)
+- Click on **TIM1**
+- Clock Source: `Internal Clock`
+- Prescaler: `71` (for 72MHz → 1MHz)
+- Counter Period: `999` (for 1ms)
+- NVIC: Enable `TIM1 update interrupt`
+
+#### Step 6: Generate Code
+- Click **Project Manager** tab
+- Set project name (e.g., `ZenOS_Blink`)
+- Toolchain: `STM32CubeIDE`
+- Click **Generate Code**
+
+### 0.5 Add ZenOS to Your Project
+
+#### Step 1: Download ZenOS
+```bash
+git clone https://github.com/rahmanh22/ZenOS.git
+```
+
+#### Step 2: Copy Files
+Copy these files from `ZenOS/ZenOS/` to your project:
+
+| From | To |
+|------|----|
+| `ZenOS.hpp` | `Inc/` |
+| `ZenOS_c.h` | `Inc/` |
+| `ZenOS_Config.hpp` | `Inc/` |
+| `ZenOS_Internal.hpp` | `Inc/` |
+| `ZenOS_Port.hpp` | `Inc/` |
+| `ZenOS.cpp` | `Src/` |
+| `ZenOS_Scheduler.cpp` | `Src/` |
+| `ZenOS_IPC.cpp` | `Src/` |
+| `ZenOS_Safety.cpp` | `Src/` |
+| `ZenOS_Monitor.cpp` | `Src/` |
+
+#### Step 3: Configure Compiler
+- Project → Properties → C/C++ Build → Settings
+- **MCU C++ Compiler** → Miscellaneous → add `-std=c++11`
+- **MCU C++ Compiler** → Optimization → select `-O2`
+
+#### Step 4: Add os_tick() to SysTick_Handler
+
+Open `Src/stm32f1xx_it.c` and add:
+
+```c
+#include "ZenOS.hpp"  // Add at top
+
+void SysTick_Handler(void)
+{
+  /* USER CODE BEGIN SysTick_IRQn 0 */
+  os_tick();
+  /* USER CODE END SysTick_IRQn 0 */
+}
+```
+
+### 0.6 Write Your First ZenOS Program
+
+Open `Src/main.cpp` and replace the content:
+
+```cpp
+#include "ZenOS.hpp"
+
+/* ─── Task: Blink LED ─── */
+void task_blink(void) {
+    while (1) {
+        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);  // Toggle LED
+        os_delay_ms(500);                          // Wait 500ms
+    }
+}
+
+/* ─── Main ─── */
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();  // Generated by CubeMX
+    MX_GPIO_Init();        // Generated by CubeMX
+    MX_TIM1_Init();        // Generated by CubeMX
+
+    os_init();             // Initialize ZenOS
+    os_task_create(task_blink, 5);  // Create task with priority 5
+    os_start();            // Start scheduler (never returns!)
+
+    while (1) {}  // Never reached
+}
+```
+
+### 0.7 Build and Flash
+
+1. Click **Build** (hammer icon) — should compile with 0 errors
+2. Click **Run** (play icon) — flash to Blue Pill
+3. LED should blink every 500ms! 🎉
+
+### 0.8 Add Serial Output (Optional)
+
+To see ZenOS messages, configure UART in CubeMX:
+
+1. Enable **USART1** (PA9=TX, PA10=RX)
+2. Baud rate: `115200`
+3. Add this helper in `main.cpp`:
+
+```cpp
+#include <cstdio>
+
+extern "C" int _write(int fd, char* ptr, int len) {
+    HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, HAL_MAX_DELAY);
+    return len;
+}
+```
+
+4. Now you can use `printf()` for debugging!
+
+### 0.9 What You Just Learned
+
+| Concept | What Happened |
+|---------|---------------|
+| **Task** | `task_blink` — a function that runs forever |
+| **Priority** | `5` — higher number = higher priority |
+| **os_delay_ms()** | Sleeps the task, lets others run |
+| **os_init()** | Initializes ZenOS kernel |
+| **os_start()** | Hands control to the scheduler |
+
+### 0.10 Common Beginner Mistakes
+
+| Mistake | Symptom | Solution |
+|---------|---------|----------|
+| Task has no `while(1)` | System crashes | Always use `while(1) {}` in tasks |
+| Task never yields | Software watchdog reset | Add `os_delay_ms()` or `os_yield()` |
+| Forgot `os_tick()` | Tick counter stuck at 0 | Add `os_tick()` to `SysTick_Handler` |
+| C++ not enabled | Compilation errors | Add `-std=c++11` to compiler flags |
+| Task created after `os_start()` | Returns -1 | Create all tasks before `os_start()` |
+
+---
+
+## 0. CubeMX Setup (Required Before First Build)
+
+> **📝 Target MCU:** These instructions use **STM32F103C8T6** as the reference. Adjust clock values and peripheral selections for your specific MCU.
+
+Before using ZenOS, you must configure STM32CubeMX correctly. This is a **one-time setup** per project.
+
+### 0.1 Move HAL Timebase from SysTick to TIM1
+
+ZenOS uses `SysTick` for its own kernel tick (`os_tick()`). HAL also needs a timebase for its internal timeouts (`HAL_Delay`, `HAL_GetTick`). If both use SysTick, they conflict.
+
+**Solution:** Move HAL's timebase to a hardware timer (TIM1).
+
+#### Step 1: Open CubeMX → Pinout & Configuration → Timers → TIM1
+
+| Setting | Value |
+|---------|-------|
+| Clock Source | Internal Clock |
+| Prescaler | `(PCLK2 / 1000000) - 1` (e.g., 71 for 72MHz) |
+| Counter Period | `999` (for 1ms) or `99` (for 100μs) |
+| Counter Mode | Up |
+| NVIC Interrupt | ✅ Enable `TIM1 update interrupt` |
+
+> **💡 Tip:** The default HAL timebase period is 1ms. ZenOS kernel tick runs independently via SysTick at 100μs (configurable).
+
+#### Step 2: Generate Code
+
+CubeMX will generate `stm32f1xx_hal_timebase_tim.c` with the TIM1 configuration.
+
+#### Step 3: Add `os_tick()` to SysTick_Handler
+
+Open `Src/stm32f1xx_it.c` and add `os_tick()` inside the `SysTick_Handler`:
+
+```c
+void SysTick_Handler(void)
+{
+  /* USER CODE BEGIN SysTick_IRQn 0 */
+  os_tick();
+  /* USER CODE END SysTick_IRQn 0 */
+
+  /* USER CODE BEGIN SysTick_IRQn 1 */
+
+  /* USER CODE END SysTick_IRQn 1 */
+}
+```
+
+> **⚠️ Important:** `os_tick()` must be called from `SysTick_Handler` — this is how ZenOS receives its tick interrupt.
+
+#### Step 4: Include the Header
+
+In `stm32f1xx_it.c`, add the include at the top:
+
+```c
+#include "ZenOS.hpp"
+```
+
+### 0.2 Copy ZenOS Files into Your Project
+
+Copy the following files from the ZenOS repository into your CubeMX-generated project:
+
+| Source (ZenOS/) | Destination (Your Project/) |
+|-----------------|----------------------------|
+| `ZenOS/ZenOS.hpp` | `Inc/` |
+| `ZenOS/ZenOS_c.h` | `Inc/` |
+| `ZenOS/ZenOS_Config.hpp` | `Inc/` |
+| `ZenOS/ZenOS_Internal.hpp` | `Inc/` |
+| `ZenOS/ZenOS_Port.hpp` | `Inc/` |
+| `ZenOS/ZenOS.cpp` | `Src/` |
+| `ZenOS/ZenOS_Scheduler.cpp` | `Src/` |
+| `ZenOS/ZenOS_IPC.cpp` | `Src/` |
+| `ZenOS/ZenOS_Safety.cpp` | `Src/` |
+| `ZenOS/ZenOS_Monitor.cpp` | `Src/` |
+
+### 0.3 Compiler Settings
+
+ZenOS uses **ARM GCC** inline assembly, `__attribute__((naked))`, and C++11 features. It **requires** the `arm-none-eabi-gcc` toolchain.
+
+**Supported compilers:**
+
+| Compiler | Supported | Notes |
+|----------|-----------|-------|
+| **ARM GCC (arm-none-eabi-gcc)** | ✅ **Required** | Version ≥ 6.x recommended |
+| **STM32CubeIDE** | ✅ | Uses ARM GCC internally |
+| **PlatformIO (GCC)** | ✅ | Uses ARM GCC internally |
+| **ARM Keil (ARMCC v5)** | ❌ | `__attribute__((naked))` syntax differs |
+| **ARM Keil (ARMClang v6)** | ⚠️ | May work — test with `__attribute__((naked))` |
+| **IAR EWARM** | ❌ | Different inline assembly syntax |
+
+**Required compiler flags:**
+
+```
+-std=c++11        # C++11 required (templates, static_assert, nullptr, RAII)
+-mcpu=cortex-m3    # Adjust for your MCU: m3, m4, m7, m0plus
+-mthumb            # Thumb instruction set
+-O2                # Recommended optimization level
+```
+
+**STM32CubeIDE setup:**
+- Project → Properties → C/C++ Build → Settings
+- **MCU C++ Compiler** → Miscellaneous → `-std=c++11 -mcpu=cortex-m3 -mthumb`
+- **MCU C++ Compiler** → Optimization → `-O2`
+
+**PlatformIO setup (`platformio.ini`):**
+```ini
+[env:bluepill]
+platform = ststm32
+board = bluepill_f103c8
+framework = stm32hal
+compiler.cppflags = -std=c++11
+```
+
+> **⚠️ Important:**
+> 1. `.cpp` files **must** be compiled as C++ (not C)
+> 2. `arm-none-eabi-gcc` ≥ 6.x is required for full C++11 support
+> 3. The `-mcpu` flag must match your MCU core (m3 for F1, m4 for F4, m7 for F7/H7)
+
+### 0.4 CubeMX Peripheral Configuration
+
+Depending on which safety features you enable, configure these peripherals in CubeMX:
+
+| Feature | CubeMX Setting |
+|---------|---------------|
+| HW Watchdog (`OS_SAFETY_HW_WATCHDOG`) | Enable **IWDG** with ~6.5s timeout |
+| CRC Check (`OS_SAFETY_CRC_CHECK`) | Enable **CRC** peripheral |
+| All others | No CubeMX changes needed (handled by ZenOS) |
+
+> **💡 Tip:** PendSV, Fault handlers (HardFault, MemManage, BusFault, UsageFault), and DWT cycle counter are **automatically configured** by `os_init()` — no manual setup needed.
+
+### 0.5 Verify Build
+
+After setup, verify:
+1. `HAL_GetTick()` works (HAL timebase on TIM1)
+2. `os_get_ms()` works (ZenOS tick on SysTick)
+3. No SysTick conflicts
+
+### 0.6 Complete File Checklist
+
+| File | What to Check |
+|------|---------------|
+| `stm32f1xx_hal_timebase_tim.c` | Generated by CubeMX (TIM1 as HAL timebase) |
+| `Src/stm32f1xx_it.c` | `os_tick()` in `SysTick_Handler` |
+| `Inc/main.h` | `#include "ZenOS.hpp"` if using OS macros |
+| `ZenOS_Config.hpp` | Review `OS_KERNEL_TICK_PERIOD_US` (default 100μs) |
+| Compiler settings | C++11 enabled for all `.cpp` files |
+| `ZenOS/ZenOS_Port.hpp` | Auto-detects MCU family — no changes needed |
 
 ---
 
@@ -1366,4 +1735,4 @@ void task_shutdown_handler(void) {
 
 ---
 
-*Generated for ZenOS RTOS v1.0.0 — See also: SAFETY_MANUAL.md, ZenOS_Config.hpp*
+*Generated for ZenOS RTOS v1.0.0 — Tested on STM32F103C8T6 — See also: SAFETY_MANUAL.md, ZenOS_Config.hpp*

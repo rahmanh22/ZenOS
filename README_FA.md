@@ -259,7 +259,7 @@ int main(void) {
 
 **با ❤️ برای جامعه تعبیه‌شده ساخته شده**
 
-[![GitHub stars](https://img.shields.io/github/stars/rahmanheidari/ZenOS?style=social)]()
+[![GitHub stars](https://img.shields.io/github/stars/rahmanh22/ZenOS?style=social)]()
 
 <br>
 

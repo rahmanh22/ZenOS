@@ -254,7 +254,7 @@ For questions, suggestions, or collaboration opportunities, feel free to reach o
 
 **Built with ❤️ for the embedded community**
 
-[![GitHub stars](https://img.shields.io/github/stars/rahmanheidari/ZenOS?style=social)]()
+[![GitHub stars](https://img.shields.io/github/stars/rahmanh22/ZenOS?style=social)]()
 
 <br>
 
