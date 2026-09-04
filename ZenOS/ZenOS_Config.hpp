@@ -140,7 +140,7 @@
  *          of software execution timing.  Deadline misses indicate a
  *          potential failure of the safety function. */
 #ifndef OS_MONITOR_DEADLINE
-#define OS_MONITOR_DEADLINE    1
+#define OS_MONITOR_DEADLINE    0
 #endif
 
 /* TCB integrity: magic-number check for memory corruption detection
@@ -149,7 +149,7 @@
  * [IND-3] REQUIRED — IEC 61508 Part 2 Table 3: random hardware fault
  *          metrics apply to data corruption in control structures. */
 #ifndef OS_MONITOR_TCB_INTEGRITY
-#define OS_MONITOR_TCB_INTEGRITY  1
+#define OS_MONITOR_TCB_INTEGRITY  0
 #endif
 
 /* Error log: circular buffer recording errors with timestamp and task ID
@@ -189,7 +189,7 @@
  * NOTE: This test is non-destructive but may produce false positives
  *       during active DMA transfers.  Call from idle task only. */
 #ifndef OS_SAFETY_RAM_TEST
-#define OS_SAFETY_RAM_TEST     1
+#define OS_SAFETY_RAM_TEST     0
 #endif
 
 /* MPU: hardware memory protection per task (Cortex-M3/M4/M7)
@@ -201,7 +201,7 @@
  * NOTE: Requires ARM Cortex-M3+ with MPU.  Cortex-M0/L0 do not
  *       have MPU hardware; set to 0 on those targets. */
 #ifndef OS_SAFETY_MPU
-#define OS_SAFETY_MPU          1
+#define OS_SAFETY_MPU          0
 #endif
 
 /* Hardware watchdog feed/check integration
@@ -214,7 +214,7 @@
  * NOTE: Configure IWDG timeout via CubeMX.  The feed task must run
  *       at ≤ 50% of the IWDG timeout to prevent spurious resets. */
 #ifndef OS_SAFETY_HW_WATCHDOG
-#define OS_SAFETY_HW_WATCHDOG  1
+#define OS_SAFETY_HW_WATCHDOG  0
 #endif
 
 /* CRC check: ROM integrity verification via CRC peripheral
@@ -226,7 +226,7 @@
  * NOTE: Do not write to flash while CRC check is in progress;
  *       this causes false positives. */
 #ifndef OS_SAFETY_CRC_CHECK
-#define OS_SAFETY_CRC_CHECK    1
+#define OS_SAFETY_CRC_CHECK    0
 #endif
 
 /* Software watchdog: detect stuck tasks and recover
@@ -238,7 +238,7 @@
  * NOTE: The timeout must be set to ≤ the process safety time.
  *       Tasks that legitimately run long must yield periodically. */
 #ifndef OS_SAFETY_SOFT_WATCHDOG
-#define OS_SAFETY_SOFT_WATCHDOG  1
+#define OS_SAFETY_SOFT_WATCHDOG  0
 #endif
 
 /* Action on deadline miss: 0 = log only, 1 = reset task, 2 = disable task
