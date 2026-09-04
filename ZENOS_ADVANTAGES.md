@@ -1,5 +1,7 @@
 # Why ZenOS? — Technical Advantages Over Other RTOSes
 
+> **Simplicity — Safety — Speed**
+
 **Version:** 1.0.0 | **Platform:** ARM Cortex-M (STM32) | **Language:** C++11
 
 ---

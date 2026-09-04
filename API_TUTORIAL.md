@@ -1,5 +1,7 @@
 # ZenOS RTOS — Complete API Tutorial & Cookbook
 
+> **Simplicity — Safety — Speed**
+
 **Version:** 1.0.0 | **Platform:** ARM Cortex-M (STM32) | **Language:** C++11 / C
 
 ---
