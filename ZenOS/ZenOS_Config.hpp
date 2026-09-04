@@ -27,9 +27,21 @@
 #define OS_KERNEL_TICK_PERIOD_US  100UL
 #endif
 
-/* Default stack size per task in bytes */
+/* Compiler optimization level string for the banner.
+   GCC's __OPTIMIZE__ macro is 1 for ALL levels >= O1 (O1, O2, O3, Og, Os),
+   so it cannot distinguish between them.  Set this manually in your
+   project's preprocessor defines to get the correct banner:
+       -DOS_OPT_LEVEL_STRING="O2"
+   If not defined, the banner shows "O+" for any optimized build. */
+/* #define OS_OPT_LEVEL_STRING "O2" */
+
+/* Default stack size per task in bytes.
+   512 instead of 256: at -O2 the optimizer inlines HAL/library frames
+   deeper than at -O0, and 256 left almost no margin (overflow would
+   corrupt adjacent TCBs silently).  Shrink back if RAM is tight — the
+   per-task peak-stack report in the test summary shows real usage. */
 #ifndef OS_KERNEL_STACK_SIZE
-#define OS_KERNEL_STACK_SIZE  256
+#define OS_KERNEL_STACK_SIZE  512
 #endif
 
 

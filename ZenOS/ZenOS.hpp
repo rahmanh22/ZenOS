@@ -107,6 +107,7 @@ void os_task_stop(void(*entry)(void));
 void os_task_start(void(*entry)(void));
 uint16_t os_get_task_count(void);
 bool os_task_isActive(void(*entry)(void));
+uint8_t os_get_task_priority(void(*entry)(void)); /* active prio (may be boosted) */
 
 /* Time */
 uint32_t os_get_tick(void);
@@ -115,7 +116,11 @@ uint32_t os_get_ms(void);
 
 /* Errors */
 uint32_t os_get_error_count(void);
+uint32_t os_get_expected_error_count(void);
+uint32_t os_get_unexpected_error_count(void);
 uint32_t os_in_safe(void);
+void os_error_expect_begin(void);
+void os_error_expect_end(void);
 
 /* Version */
 uint32_t os_get_version(void);
@@ -192,6 +197,15 @@ extern "C" {
 
 /* ── Monitor ── */
 #if OS_MONITOR_DEADLINE || OS_MONITOR_TCB_INTEGRITY || OS_MONITOR_ERROR_LOG
+
+/* One entry of the per-task stack usage report (os_get_stack_report) */
+typedef struct {
+    const char* name;        /* task name ("idle" for the idle task) */
+    uint8_t     id;          /* task ID */
+    uint32_t    size_bytes;  /* total stack size */
+    uint32_t    peak_bytes;  /* peak usage since last start/reset */
+} os_stack_report_entry_t;
+
 extern "C" {
     uint8_t  os_task_get_state(void(*entry)(void));
     uint8_t  os_get_cpu_usage(void);
@@ -202,6 +216,8 @@ extern "C" {
     uint8_t  os_get_task_cpu_usage(void(*entry)(void));
     uint32_t os_get_stack_watermark(uint8_t task_id);
     uint32_t os_get_stack_watermark_percent(uint8_t task_id);
+    uint8_t  os_get_stack_report_count(void);
+    bool     os_get_stack_report(uint8_t index, os_stack_report_entry_t* out);
 }
 #endif
 

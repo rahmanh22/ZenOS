@@ -16,9 +16,14 @@ volatile uint32_t os_safe_depth = 0;
 
 
 /* ═══════════════ متغیرهای سراسری ═══════════════ */
-TCB*              task_list    = nullptr;
-uint16_t          task_count   = 0;
-TCB*              current_task = nullptr;
+/* All scheduler globals below are shared between task context, the naked
+   PendSV handler and the SysTick/EXTI ISRs.  They MUST be volatile: at
+   -O2 the compiler otherwise keeps them cached in registers across the
+   asm boundaries (os_yield, OS_PendSV_Handler) and the scheduler then
+   switches to stale TCBs — the classic "works at -O0, corrupt at -O2". */
+TCB*              volatile task_list    = nullptr;
+uint16_t          volatile task_count   = 0;
+TCB*              volatile current_task = nullptr;
 
 /* ═══════════════ SMP (Symmetric Multi-Processing) ═══════════════ */
 #if OS_SMP_CORES > 1
@@ -55,7 +60,7 @@ uint32_t          idle_stack[OS_IDLE_STACK_WORDS] OS_ALIGNED(8);
 volatile uint32_t tick_count = 0;
 
 #if OS_TOOL_EVENT
-static ECB* event_list = nullptr;
+static ECB* volatile event_list = nullptr;
 #endif
 
 static TCB idle_tcb;
@@ -104,10 +109,10 @@ static volatile bool     os_started      = false;
    Instead of scanning the linked list O(n), we maintain a 32-bit
    bitmap where each bit represents a priority level (0-31).
    CLZ (Count Leading Zeros) finds the highest set bit in 1 cycle. ═══════════════ */
-static uint32_t os_ready_bitmap = 0;
+static volatile uint32_t os_ready_bitmap = 0;
 
 /* Priority queue heads: os_pq_head[priority] = first TCB at that priority */
-static TCB* os_pq_head[32] = {nullptr};
+static TCB* volatile os_pq_head[32] = {nullptr};
 
 static inline void os_pq_set_bit(uint8_t prio) {
 	if (prio < 32) os_ready_bitmap |= (1UL << prio);
@@ -135,7 +140,7 @@ static void os_pq_add(TCB* task) {
 static void os_pq_remove(TCB* task) {
 	if (!task || task->priority >= 32) return;
 	uint8_t p = task->priority;
-	TCB** pp = &os_pq_head[p];
+	TCB* volatile* pp = &os_pq_head[p];
 	while (*pp) {
 		if (*pp == task) {
 			*pp = task->queue_next;
@@ -211,8 +216,12 @@ static uint32_t fault_stack[OS_FAULT_STACK_WORDS] OS_ALIGNED(8);
 /* OS_STR macros are defined in OSTM32_config.hpp */
 
 /* ═══════════════ Error System ═══════════════ */
-static uint32_t error_total = 0;
-static OSError  error_last  = OSError::NONE;
+/* Error counters are touched from ISR context (os_tick reports DEADLINE_MISS /
+   TASK_STUCK / STACK_OVERFLOW) and read from task context — volatile too. */
+static volatile uint32_t error_total = 0;
+static volatile OSError  error_last  = OSError::NONE;
+static volatile uint32_t error_expected     = 0;  /* errors inside OS_ERROR_EXPECTED */
+static volatile uint32_t error_expect_depth = 0;  /* nesting depth of the marker     */
 static volatile uint32_t wdg_reset_count      = 0;
 static volatile uint32_t stack_recovery_count = 0;
 
@@ -221,13 +230,21 @@ uint32_t os_get_wdg_reset_count(void)      { return wdg_reset_count; }
 uint32_t os_get_stack_recovery_count(void) { return stack_recovery_count; }
 #endif
 
-uint32_t os_get_error_count(void) { return error_total; }
-OSError  os_get_last_error(void)  { return error_last; }
-uint32_t os_in_safe(void)         { return os_safe_depth; }
+uint32_t os_get_error_count(void)            { return error_total; }
+uint32_t os_get_expected_error_count(void)   { return error_expected; }
+uint32_t os_get_unexpected_error_count(void) { return error_total - error_expected; }
+OSError  os_get_last_error(void)             { return error_last; }
+uint32_t os_in_safe(void)                    { return os_safe_depth; }
+
+/* Mark a region whose errors are deliberate (test fault injection): errors
+   reported inside are excluded from os_get_unexpected_error_count(). */
+extern "C" void os_error_expect_begin(void) { error_expect_depth++; }
+extern "C" void os_error_expect_end(void)   { if (error_expect_depth > 0) error_expect_depth--; }
 
 /* Opt4: os_report_error — no CS needed (error path only, last-writer-wins) */
 void os_report_error(OSError code) {
 	error_total++;
+	if (error_expect_depth > 0) error_expected++;
 	error_last = code;
 }
 
@@ -577,6 +594,14 @@ extern "C" bool os_task_isActive(void(*entry)(void)) {
 	return ((result != (uint8_t)TaskState::INACTIVE) ? true : false);
 }
 
+extern "C" uint8_t os_get_task_priority(void(*entry)(void)) {
+	uint32_t cs = os_critical_enter();
+	TCB* t = os_find_task_by_entry(entry);
+	uint8_t result = t ? t->priority : 0;
+	os_critical_exit(cs);
+	return result;
+}
+
 
 /* ═══════════════ Tickless Processing ═══════════════ */
 #if OS_TOOL_TICKLESS_IDLE
@@ -771,6 +796,13 @@ extern "C" void os_yield(void) {
 	    "ldr   r1, [r0]\n"
 	    "orr   r1, r1, #0x10000000\n"
 	    "str   r1, [r0]\n"
+	    : /* no outputs */
+	    : /* no inputs */
+	    : "r0", "r1", "r2", "cc", "memory"
+	    /* The asm destroys r0/r1/r2 and the condition flags, and writes
+	       current_task->last_yield_tick + SCB_ICSR.  Without this clobber
+	       list GCC at -O2 keeps live values in these registers across the
+	       asm and the scheduler state corrupts. */
 	);
 }
 
@@ -1199,7 +1231,10 @@ static uint32_t os_stack_watermark_scan(const TCB* task) {
 	const uint32_t* base = task->stack_base;
 	uint32_t size = task->stack_size;
 	uint32_t used_words = 0;
-	for (uint32_t i = 0; i < size; i++) {
+	/* The canary region (base[0..CANARY_COUNT-1], 0xDEADBEEF) sits at the
+	   bottom of the stack — skip it and scan for the first non-fill word,
+	   which marks the deepest the stack pointer has ever reached. */
+	for (uint32_t i = OS_STACK_CANARY_COUNT; i < size; i++) {
 		if (base[i] != 0xA5A5A5A5UL) {
 			used_words = size - i;
 			break;
@@ -1225,6 +1260,36 @@ extern "C" uint32_t os_get_stack_watermark_percent(uint8_t task_id) {
 	uint32_t total = t->stack_size * 4;
 	os_critical_exit(cs);
 	return (total > 0) ? (used * 100 / total) : 0;
+}
+
+/* ── Per-task stack usage report (enumerate all tasks by index) ── */
+extern "C" uint8_t os_get_stack_report_count(void) {
+	uint8_t n = 0;
+	uint32_t cs = os_critical_enter();
+	for (TCB* t = task_list; t; t = t->next)
+		if (t->stack_base) n++;
+	os_critical_exit(cs);
+	return n;
+}
+
+extern "C" bool os_get_stack_report(uint8_t index, os_stack_report_entry_t* out) {
+	if (!out) return false;
+	uint32_t cs = os_critical_enter();
+	uint8_t i = 0;
+	for (TCB* t = task_list; t; t = t->next) {
+		if (!t->stack_base) continue;
+		if (i == index) {
+			out->name       = t->name;
+			out->id         = t->id;
+			out->size_bytes = t->stack_size * 4;
+			out->peak_bytes = os_stack_watermark_scan(t);
+			os_critical_exit(cs);
+			return true;
+		}
+		i++;
+	}
+	os_critical_exit(cs);
+	return false;
 }
 #endif /* OS_MONITOR_ENABLED */
 
@@ -1290,7 +1355,10 @@ extern "C" uint8_t os_get_task_cpu_usage(void(*entry)(void)) {
 extern "C" void os_task_set_deadline_raw(void(*entry)(void), uint32_t deadline_ms) {
 	TCB* t = os_find_task_by_entry(entry);
 	if (!t) return;
-	uint32_t deadline_ticks = os_ms_to_ticks(deadline_ms);
+	/* deadline_ms == 0 disables the deadline. os_ms_to_ticks(0) would
+	   otherwise return 1 (its "at least one tick" guard), turning a reset
+	   into a 1-tick deadline that streams DEADLINE_MISS on every tick. */
+	uint32_t deadline_ticks = (deadline_ms == 0) ? 0 : os_ms_to_ticks(deadline_ms);
 	uint32_t cs = os_critical_enter();
 	t->deadline_ticks = deadline_ticks;
 	t->deadline_miss_count = 0;
@@ -1743,7 +1811,8 @@ extern "C" void os_init(void) {
 	idle_tcb.priority = 0; idle_tcb.base_priority = 0;
 	idle_tcb.state = TaskState::INACTIVE;
 	idle_tcb.next = nullptr;
-	os_safe_depth = 0; error_total = 0; error_last = OSError::NONE;
+	os_safe_depth = 0; error_total = 0; error_expected = 0;
+	error_expect_depth = 0; error_last = OSError::NONE;
 	idle_ticks = 0; wdg_reset_count = 0; stack_recovery_count = 0;
 	os_syst_rvr_normal = 0;
 	/* O(1) scheduler: initialize priority bitmap and queues */
@@ -1834,8 +1903,6 @@ extern "C" OS_NAKED OS_USED void OS_PendSV_Handler(void) {
 	    "mrs r0, psp\n"
 	    "ldr r1, =current_task\n"
 	    "ldr r1, [r1]\n"
-	    "ldr r8, =tick_count\n"
-	    "ldr r9, =os_idle_tcb_ptr\n"
 	    "cmp r1, #0\n"
 	    "bne save_ctx\n"
 	    "b first_run\n"
@@ -1850,6 +1917,11 @@ extern "C" OS_NAKED OS_USED void OS_PendSV_Handler(void) {
 	    "movs r2, #1\n"
 	    "strb r2, [r1, #" OS_STR(OS_OFF_STATE) "]\n"
 	    "skip_save:\n"
+
+	    /* Load r8/r9 AFTER saving context so the interrupted task's
+	       original register values are preserved on its stack. */
+	    "ldr r8, =tick_count\n"
+	    "ldr r9, =os_idle_tcb_ptr\n"
 
 	    /* O(1) Scheduler: call os_pq_next() to get highest priority task.
 	       r8/r9 hold tick_count/os_idle_tcb_ptr addresses across the calls. */
@@ -1894,6 +1966,8 @@ extern "C" OS_NAKED OS_USED void OS_PendSV_Handler(void) {
 	    "b restore_ctx\n"
 
 	    "first_run:\n"
+	    "ldr r8, =tick_count\n"
+	    "ldr r9, =os_idle_tcb_ptr\n"
 	    "push {lr}\n"
 	    "bl os_pq_next\n"
 	    "mov r5, r0\n"
