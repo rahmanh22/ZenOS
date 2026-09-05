@@ -1,5 +1,5 @@
 <div align="center">
-<img src="zenos_logo.svg" alt="ZenOS Logo" width="300" />
+<img src="ZenOS_logo.svg" alt="ZenOS Logo" width="300" />
 </div>
 
 # راهنمای ایمنی سیستم‌عامل ZenOS
