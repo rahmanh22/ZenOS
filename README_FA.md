@@ -135,7 +135,7 @@ int main(void) {
 | 📗 [API_TUTORIAL.md](API_TUTORIAL.md) | راهنمای کامل API با مثال‌ها (انگلیسی) |
 | 🤝 [CONTRIBUTING_FA.md](CONTRIBUTING_FA.md) | نحوه مشارکت |
 | ⚡ [ZENOS_ADVANTAGES.md](ZENOS_ADVANTAGES.md) | مقایسه فنی با FreeRTOS، Zephyr، RT-Thread |
-| ⚙️ [ZenOS_Config.hpp](ZenOS/ZenOS/ZenOS_Config.hpp) | هر گزینه پیکربندی با یادداشت‌های ایمنی |
+| ⚙️ [ZenOS_Config.hpp](ZenOS/ZenOS_Config.hpp) | هر گزینه پیکربندی با یادداشت‌های ایمنی |
 
 ---
 
