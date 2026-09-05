@@ -1,3 +1,7 @@
+<div align="center">
+<img src="zenos_logo.svg" alt="ZenOS Logo" width="300" />
+</div>
+
 # ZenOS RTOS — Safety Manual
 
 **Version:** 1.0.0  

@@ -1,3 +1,7 @@
+<div align="center">
+<img src="zenos_logo.svg" alt="ZenOS Logo" width="300" />
+</div>
+
 # آموزش جامع API سیستم‌عامل بلادرنگ ZenOS
 
 **نسخه:** 1.0.0 | **پلتفرم:** ARM Cortex-M (STM32) | **زبان:** C++11 / C

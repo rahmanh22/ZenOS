@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ ZenOS
+<img src="zenos_logo.svg" alt="ZenOS Logo" width="300" />
 
 **سیستم‌عامل بلادرنگ برای ARM Cortex-M — نوشته‌شده با C++11.**
 

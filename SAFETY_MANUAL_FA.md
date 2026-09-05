@@ -1,3 +1,7 @@
+<div align="center">
+<img src="zenos_logo.svg" alt="ZenOS Logo" width="300" />
+</div>
+
 # راهنمای ایمنی سیستم‌عامل ZenOS
 
 **نسخه:** 1.0.0 | **تاریخ:** سپتامبر 2026 | **نویسنده:** تیم تحقیقاتی رایمون (Raymon Research Team) | **مجوز:** MIT

@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ ZenOS
+<img src="zenos_logo.svg" alt="ZenOS Logo" width="300" />
 
 **RT operating system for ARM Cortex-M — written in C++11.**
 

@@ -1,3 +1,7 @@
+<div align="center">
+<img src="zenos_logo.svg" alt="ZenOS Logo" width="300" />
+</div>
+
 # ZenOS RTOS — Complete API Tutorial & Cookbook
 
 **Version:** 1.0.0 | **Platform:** ARM Cortex-M (STM32) | **Language:** C++11 / C
