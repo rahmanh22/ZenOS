@@ -470,4 +470,4 @@ ZenOS SMP is:
 
 *Built by Raymon Research Team (تیم تحقیقاتی رایمون)*
 
-*ZenOS — fewer lines, fewer headaches.*
+*ZenOS — (Simplicity , Security , Speed).*
