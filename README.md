@@ -133,7 +133,7 @@ For the full API guide → [API_TUTORIAL.md](API_TUTORIAL.md) | [راهنمای 
 | 📗 [API_TUTORIAL_FA.md](API_TUTORIAL_FA.md) | Complete API guide with examples (Persian) |
 | 🤝 [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 | ⚡ [ZENOS_ADVANTAGES.md](ZENOS_ADVANTAGES.md) | Technical comparison with FreeRTOS, Zephyr, RT-Thread |
-| ⚙️ [ZenOS_Config.hpp](ZenOS/ZenOS/ZenOS_Config.hpp) | Every config option with safety annotations |
+| ⚙️ [ZenOS_Config.hpp](ZenOS/ZenOS_Config.hpp) | Every config option with safety annotations |
 
 ---
 
