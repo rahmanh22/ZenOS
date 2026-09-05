@@ -4,8 +4,6 @@
 
 **RT operating system for ARM Cortex-M — written in C++11.**
 
-### **Simplicity — Security — Speed**
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-1.0.0-green.svg?style=for-the-badge)]()
 [![Platform](https://img.shields.io/badge/Platform-ARM%20Cortex--M-orange.svg?style=for-the-badge)]()
